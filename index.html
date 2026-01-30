@@ -121,6 +121,7 @@
       background: var(--success);
       box-shadow: 0 0 15px rgba(56, 161, 105, 0.4);
     }
+    .day-card.disabled { opacity: 0.45; cursor: not-allowed; }
 
     .day-card .num { font-weight: bold; font-size: 1.1rem; }
     .day-card .name { font-size: 0.75rem; opacity: 0.8; }
@@ -245,7 +246,18 @@
         </div>
         <div class="field-group">
           <label>رقم الهاتف</label>
-          <input type="tel" id="userPhone" placeholder="0770XXXXXXX" required>
+          <div style="display:flex;gap:8px">
+            <select id="countryCode" style="min-width:110px;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:var(--glass);color:var(--text)">
+              <option value="+973" selected>+973 البحرين</option>
+              <option value="+964">+964 العراق</option>
+              <option value="+966">+966 السعودية</option>
+              <option value="+971">+971 الإمارات</option>
+              <option value="+962">+962 الأردن</option>
+              <option value="+965">+965 الكويت</option>
+              <option value="+963">+963 سوريا</option>
+            </select>
+            <input type="tel" id="userPhone" placeholder="770XXXXXXX" required>
+          </div>
         </div>
       </div>
 
@@ -279,6 +291,25 @@
 
       <button type="submit" class="submit-btn" id="subBtn" disabled>احجز الآن</button>
     </form>
+
+    <div class="calendar-section" style="margin-top:1rem">
+      <h3 style="margin:0 0 8px 0">حجوزاتي</h3>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+        <select id="myCountryCode" style="min-width:110px;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:var(--glass);color:var(--text)">
+          <option value="+973" selected>+973 البحرين</option>
+          <option value="+964">+964 العراق</option>
+          <option value="+966">+966 السعودية</option>
+          <option value="+971">+971 الإمارات</option>
+          <option value="+962">+962 الأردن</option>
+          <option value="+965">+965 الكويت</option>
+          <option value="+963">+963 سوريا</option>
+        </select>
+        <input type="tel" id="myPhone" placeholder="770XXXXXXX" style="flex:1;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:var(--glass);color:var(--text)">
+        <button type="button" id="loadMy" class="submit-btn" style="padding:8px 12px;margin-left:8px">عرض حجوزاتي</button>
+      </div>
+      <div id="myList" style="background:var(--card);padding:8px;border-radius:8px">لا توجد حجوزات</div>
+    </div>
+
   </div>
 </div>
 
@@ -317,8 +348,10 @@
   const subBtn = document.getElementById('subBtn');
 
   // إنشاء الأيام
+  function todayString(){ const t = new Date(); return t.toISOString().split('T')[0]; }
   function renderDays(date) {
     daysRow.innerHTML = '';
+    const today = todayString();
     for (let i = -2; i < 8; i++) {
       let d = new Date(date);
       d.setDate(d.getDate() + i);
@@ -326,12 +359,14 @@
       dayCard.className = 'day-card';
       let dStr = d.toISOString().split('T')[0];
       if(dStr === selectedDate) dayCard.classList.add('selected');
+      if(dStr < today){ dayCard.classList.add('disabled'); }
 
       dayCard.innerHTML = `
         <div class="name">${d.toLocaleDateString('ar-EG', {weekday:'short'})}</div>
         <div class="num">${d.getDate()}</div>
       `;
       dayCard.onclick = () => {
+        if(dStr < today){ alert('لا يمكنك الحجز في تواريخ سابقة'); return; }
         selectedDate = dStr;
         renderDays(date);
         renderSlots();
@@ -350,6 +385,8 @@
       slotsGrid.innerHTML = '<div style="opacity:0.7">اختر يومًا لعرض الأوقات المتاحة</div>';
       return;
     }
+    // block past dates
+    if(selectedDate < todayString()){ slotsGrid.innerHTML = '<div style="opacity:0.8">لا يمكنك الحجز في هذا التاريخ</div>'; return; }
     // جلب الأوقات المتاحة من السيرفر
     fetch('/api/slots?date=' + selectedDate).then(r=>r.json()).then(list=>{
       list.forEach(s => {
@@ -423,23 +460,64 @@
   document.getElementById('prevW').onclick = () => { currentDate.setDate(currentDate.getDate() - 7); renderDays(currentDate); };
   document.getElementById('nextW').onclick = () => { currentDate.setDate(currentDate.getDate() + 7); renderDays(currentDate); };
 
+  // User bookings
+  function renderMyBookings(rows){
+    const container = document.getElementById('myList'); container.innerHTML = '';
+    if(!rows || rows.length===0){ container.textContent = 'لا توجد حجوزات'; return; }
+    rows.forEach(r=>{
+      const div = document.createElement('div'); div.style.padding='8px'; div.style.borderBottom='1px solid rgba(255,255,255,0.03)';
+      const canCancel = (function(){ const dt = new Date(`${r.date}T${r.time}:00`); return dt.getTime() > Date.now(); })();
+      div.innerHTML = `<div style="font-weight:700">${r.date} ${r.time} · ${r.duration} د</div><div style="opacity:0.9">${r.name} — ${r.phone}</div>`;
+      if(canCancel){ const b = document.createElement('button'); b.textContent='إلغاء'; b.style.marginTop='6px'; b.onclick = async ()=>{ if(!confirm('هل تريد إلغاء هذا الحجز؟'))return; const res = await fetch('/api/bookings/'+r.id+'/cancel',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({phone:document.getElementById('myCountryCode').value + document.getElementById('myPhone').value.replace(/\D/g,'')})}); const data = await res.json(); if(res.ok){ alert('تم الإلغاء'); loadMyBookings(); renderDays(currentDate); renderSlots(); } else alert('فشل: '+(data.error||'غير متوقع')); }; div.appendChild(b); }
+      container.appendChild(div);
+    });
+  }
+
+  async function loadMyBookings(){
+    const cc = document.getElementById('myCountryCode').value || '+973';
+    const phoneRaw = document.getElementById('myPhone').value.trim();
+    const digits = phoneRaw.replace(/\D/g,'');
+    if(!digits){ alert('ادخل رقم هاتف لعرض حجوزاتك'); return; }
+    const phone = digits.startsWith('+') ? digits : (digits.startsWith('0') ? cc + digits.replace(/^0+/, '') : cc + digits);
+    localStorage.setItem('lastPhone', phone);
+    const res = await fetch('/api/bookings/user?phone='+encodeURIComponent(phone));
+    if(!res.ok){ alert('فشل جلب الحجوزات'); return; }
+    const rows = await res.json(); renderMyBookings(rows);
+  }
+
+  document.getElementById('loadMy').onclick = loadMyBookings;
+  // prefill last phone
+  window.addEventListener('load', ()=>{ const lp = localStorage.getItem('lastPhone'); if(lp){ document.getElementById('myPhone').value = lp.replace(/^\+\d{1,3}/,''); const cc = '+'+lp.replace(/^\+/, '').slice(0,3); document.getElementById('myCountryCode').value = lp.slice(0,4) || '+973'; } });
+
   // إرسال الحجز إلى السيرفر
   document.getElementById('bookingForm').addEventListener('submit', async (e)=>{
     e.preventDefault();
     const name = document.getElementById('userName').value.trim();
-    const phone = document.getElementById('userPhone').value.trim();
+    const cc = document.getElementById('countryCode').value || '+973';
+    let phoneRaw = document.getElementById('userPhone').value.trim();
+    let phoneDigits = phoneRaw.replace(/\D/g,'');
+    if(!phoneDigits) return alert('ادخل رقم هاتف صحيح');
+    let phone = phoneDigits.startsWith('0') ? cc + phoneDigits.replace(/^0+/, '') : (phoneDigits.startsWith('+') ? phoneDigits : cc + phoneDigits);
     if(!name || !phone || !selectedDate || !selectedTime || !selectedMins) return alert('اكمل الحقول المطلوبة');
-    const payload = { name, phone, date: selectedDate, time: selectedTime, duration: selectedMins, price: selectedPrice };
+    const payload = { name, phone, date: selectedDate, time: selectedTime, duration: selectedMins };
     try{
       const r = await fetch('/api/bookings', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify(payload) });
       const data = await r.json();
-      if(r.status === 409) { alert('هذا الوقت محجوز، اختر وقتًا آخر'); renderSlots(); return; }
-      if(!r.ok) { alert('خطأ: ' + (data.error || 'فشل الاتصال')); return; }
+      if(r.status === 409){ alert('هذا الوقت محجوز، اختر وقتًا آخر'); renderSlots(); return; }
+      if(!r.ok){ alert('خطأ: ' + (data.error || 'فشل الاتصال')); return; }
+      // عرض تأكيد وحفظ الهاتف لعرض الحجوزات
       alert('تم الحجز بنجاح');
+      localStorage.setItem('lastPhone', phone);
+      // إذا واجهة "حجوزاتي" موجودة، قم بتعبئتها وعرض الحجوزات فورًا
+      const myPhoneEl = document.getElementById('myPhone');
+      const myCCEl = document.getElementById('myCountryCode');
+      if(myPhoneEl) myPhoneEl.value = phone.replace(/^\+\d{1,3}/,'');
+      if(myCCEl) myCCEl.value = phone.slice(0,4) || cc;
       // مسح الاختيارات
       selectedTime = ''; selectedDate = ''; selectedPrice = 0; selectedMins = 0;
       document.getElementById('userName').value=''; document.getElementById('userPhone').value='';
       renderDays(currentDate); renderSlots(); updateSummary();
+      if(typeof loadMyBookings === 'function') loadMyBookings();
     }catch(err){ alert('فشل الاتصال بالسيرفر'); }
   });
 

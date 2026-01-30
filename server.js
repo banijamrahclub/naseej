@@ -64,9 +64,52 @@ async function initDb(){
     await runSql(`INSERT INTO settings (key, value) VALUES ('admin_password', ?)` , [hash]);
     console.log('Admin password set to default ->', DEFAULT_ADMIN_PWD);
   }
+
+  // purge past bookings (dates strictly before today localtime)
+  try{
+    const res = await runSql(`DELETE FROM bookings WHERE date < date('now','localtime')`);
+    console.log('Purged past bookings on startup, rows:', res.changes);
+  }catch(e){ console.error('Purge past bookings failed', e); }
 }
 
 initDb().catch(err => { console.error('DB init error', err); process.exit(1); });
+
+// User-facing: list bookings by phone (no auth)
+app.get('/api/bookings/user', async (req, res) => {
+  const phone = req.query.phone;
+  if(!phone) return res.status(400).json({error:'phone required'});
+  const rows = await allSql(`SELECT * FROM bookings WHERE phone = ? ORDER BY date, time`, [phone]);
+  res.json(rows);
+});
+
+function dateTimeIsInFuture(dateStr, timeStr){
+  // dateStr YYYY-MM-DD, timeStr HH:MM
+  const dt = new Date(`${dateStr}T${timeStr}:00`);
+  return dt.getTime() > Date.now();
+}
+
+// User cancellation (by phone matching)
+app.post('/api/bookings/:id/cancel', async (req, res) => {
+  const id = req.params.id;
+  const phone = req.body.phone;
+  if(!phone) return res.status(400).json({error:'phone required'});
+  const row = await getSql(`SELECT * FROM bookings WHERE id = ?`, [id]);
+  if(!row) return res.status(404).json({error:'not found'});
+  if(row.phone !== phone) return res.status(403).json({error:'phone mismatch'});
+  // only allow cancellation for future bookings
+  if(!dateTimeIsInFuture(row.date, row.time)) return res.status(400).json({error:'cannot cancel past or started booking'});
+  await runSql(`DELETE FROM bookings WHERE id = ?`, [id]);
+  if(global.sendSSEEvent) global.sendSSEEvent('booking-deleted', { id: id, date: row.date });
+  res.json({ok:true});
+});
+
+// Admin: delete past bookings on demand
+app.delete('/api/bookings/past', async (req, res) => {
+  if(!req.session || !req.session.isAdmin) return res.status(401).json({error:'unauthorized'});
+  const r = await runSql(`DELETE FROM bookings WHERE date < date('now','localtime')`);
+  if(global.sendSSEEvent) global.sendSSEEvent('bookings-cleared', {});
+  res.json({ok:true, deleted: r.changes});
+});
 
 // helper: check overlap
 function timeToMinutes(t){ const [h,m] = t.split(':').map(Number); return h*60 + m; }
@@ -131,9 +174,20 @@ app.post('/api/bookings', async (req, res) => {
   const r = await runSql(`INSERT INTO bookings (name, phone, date, time, duration, price) VALUES (?,?,?,?,?,?)`, [name, phone, date, time, dur, priceToUse]);
   const id = r.lastID;
   const row = await getSql(`SELECT * FROM bookings WHERE id = ?`, [id]);
+
+  // SMS feature removed — no messages are sent from the server.
+
   // broadcast to SSE clients
   if(global.sendSSEEvent) global.sendSSEEvent('booking-created', row);
   res.json(row);
+});
+
+// Admin: delete all bookings
+app.delete('/api/bookings/all', async (req, res) => {
+  if(!req.session || !req.session.isAdmin) return res.status(401).json({error:'unauthorized'});
+  await runSql(`DELETE FROM bookings`);
+  if(global.sendSSEEvent) global.sendSSEEvent('bookings-cleared', {});
+  res.json({ok:true});
 });
 
 app.delete('/api/bookings/:id', async (req, res) => {

@@ -90,6 +90,15 @@
     <h3 style="margin-top:12px">أضف حجز يدوي</h3>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
       <input id="mName" placeholder="الاسم" />
+      <select id="mCountry" style="min-width:110px;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);color:#fff">
+        <option value="+973" selected>+973 البحرين</option>
+        <option value="+964">+964 العراق</option>
+        <option value="+966">+966 السعودية</option>
+        <option value="+971">+971 الإمارات</option>
+        <option value="+962">+962 الأردن</option>
+        <option value="+965">+965 الكويت</option>
+        <option value="+963">+963 سوريا</option>
+      </select>
       <input id="mPhone" placeholder="الهاتف" />
       <input id="mDate" type="date" />
       <input id="mTime" type="time" />
@@ -97,6 +106,7 @@
       <input id="mPrice" placeholder="السعر" />
       <button id="mAdd">أضف</button>
     </div>
+    <div style="margin-top:8px"><button id="clearAll" style="background:#e63946;color:#fff;padding:6px 10px;border-radius:6px;border:none">حذف جميع الحجوزات</button></div>
 
 
 
@@ -118,6 +128,15 @@
         <h3>أضف حجز يدوي</h3>
         <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
           <input id="addName" placeholder="الاسم" />
+          <select id="addCountry" style="min-width:110px;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);color:#fff">
+            <option value="+973" selected>+973 البحرين</option>
+            <option value="+964">+964 العراق</option>
+            <option value="+966">+966 السعودية</option>
+            <option value="+971">+971 الإمارات</option>
+            <option value="+962">+962 الأردن</option>
+            <option value="+965">+965 الكويت</option>
+            <option value="+963">+963 سوريا</option>
+          </select>
           <input id="addPhone" placeholder="الهاتف" />
           <input id="addDate" type="date" />
           <input id="addTime" type="time" />
@@ -212,7 +231,12 @@
     mPriceEl.value = staticPromos[mDurEl.value] || '';
 
     document.getElementById('mAdd').onclick = async ()=>{
-      const name=document.getElementById('mName').value; const phone=document.getElementById('mPhone').value;
+      const name=document.getElementById('mName').value;
+      const cc = document.getElementById('mCountry').value || '+973';
+      let phoneRaw=document.getElementById('mPhone').value.trim();
+      let digits = phoneRaw.replace(/\D/g,'');
+      if(!digits) return alert('ادخل رقم هاتف صحيح');
+      let phone = digits.startsWith('0') ? cc + digits.replace(/^0+/, '') : (digits.startsWith('+') ? digits : cc + digits);
       const date=document.getElementById('mDate').value; const time=document.getElementById('mTime').value;
       const duration=document.getElementById('mDur').value; const price=document.getElementById('mPrice').value||0;
       const res = await postJson('/api/bookings',{name,phone,date,time,duration,price});
@@ -240,6 +264,16 @@
 
     document.getElementById('weekPrev').onclick = ()=>{
       const el = document.getElementById('weekStart'); let d = new Date(el.value || getWeekStartFor(new Date())); d.setDate(d.getDate()-7); el.value = d.toISOString().split('T')[0]; document.getElementById('weekLoad').click();
+    }
+
+    document.getElementById('clearAll').onclick = async ()=>{
+      if(!confirm('هل أنت متأكد؟ سيتم حذف كل الحجوزات نهائياً')) return;
+      try{
+        const r = await fetch('/api/bookings/all', { method: 'DELETE', credentials: 'same-origin' });
+        const data = await r.json();
+        if(r.ok){ alert('تم حذف جميع الحجوزات'); loadBookings(); const wkStart=document.getElementById('weekStart').value; if(wkStart) document.getElementById('weekLoad').click(); }
+        else alert('فشل: '+(data.error||'غير متوقع'));
+      }catch(e){ alert('فشل الاتصال'); }
     }
     document.getElementById('weekNext').onclick = ()=>{
       const el = document.getElementById('weekStart'); let d = new Date(el.value || getWeekStartFor(new Date())); d.setDate(d.getDate()+7); el.value = d.toISOString().split('T')[0]; document.getElementById('weekLoad').click();
@@ -333,7 +367,11 @@
 
     document.getElementById('addSave').onclick = async ()=>{
       const name = document.getElementById('addName').value.trim();
-      const phone = document.getElementById('addPhone').value.trim();
+      const cc = document.getElementById('addCountry').value || '+973';
+      let phoneRaw = document.getElementById('addPhone').value.trim();
+      let digits = phoneRaw.replace(/\D/g,'');
+      if(!digits) return alert('ادخل رقم هاتف صحيح');
+      let phone = digits.startsWith('0') ? cc + digits.replace(/^0+/, '') : (digits.startsWith('+') ? digits : cc + digits);
       const date = document.getElementById('addDate').value;
       const time = document.getElementById('addTime').value;
       const duration = Number(document.getElementById('addDur').value);
@@ -364,6 +402,7 @@
         window.eventS = new EventSource('/api/events');
         window.eventS.addEventListener('booking-created', e => { const b = JSON.parse(e.data); onBookingCreated(b); });
         window.eventS.addEventListener('booking-deleted', e => { const d = JSON.parse(e.data); onBookingDeleted(d); });
+        window.eventS.addEventListener('bookings-cleared', e => { document.querySelector('#bookingsTable tbody').innerHTML=''; document.getElementById('weekLoad').click(); });
         window.eventS.onerror = (err)=>{ console.error('SSE error', err); };
       }catch(e){ console.error('EventSource init failed', e); }
     }
