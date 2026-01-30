@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>حجز ملعب - نسيج</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg1: #0f2027;
+      --bg2: #203a43;
+      --accent: #ffb703;
+      --card: rgba(255,255,255,0.06);
+      --glass: rgba(255,255,255,0.04);
+      --text: #f8f9fa;
+      --muted: #cfd8dc;
+      --success: #38a169;
+      --booked: #b22a3b;
+    }
+
+    * { box-sizing: border-box; }
+    
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: 'Cairo', sans-serif;
+      background: linear-gradient(135deg, var(--bg1) 0%, var(--bg2) 100%);
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+      padding: 20px;
+      overflow-x: hidden;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 900px; /* تقليل العرض الأقصى ليكون التصميم ملموماً أكثر */
+    }
+
+    .hero {
+      background: rgba(255,255,255,0.03);
+      padding: 1.5rem;
+      border-radius: 15px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .hero h1 { margin: 0 0 0.5rem 0; font-size: 1.5rem; text-align: center; }
+    .hero p { margin: 0 0 1.5rem 0; color: var(--muted); text-align: center; font-size: 0.9rem; }
+
+    .booking-form {
+      display: flex;
+      flex-direction: column;
+      gap: 1.2rem;
+    }
+
+    /* تقسيم الحقول */
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    .field-group { display: flex; flex-direction: column; gap: 0.5rem; }
+    label { font-weight: 600; font-size: 0.9rem; color: var(--accent); }
+
+    input[type="text"], input[type="tel"] {
+      width: 100%;
+      padding: 0.8rem;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: var(--glass);
+      color: var(--text);
+      outline: none;
+    }
+
+    /* منطقة التقويم والأوقات */
+    .calendar-section {
+      background: var(--card);
+      padding: 1rem;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .month-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+
+    .month-nav button {
+      background: var(--glass);
+      border: none;
+      color: white;
+      padding: 5px 15px;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .days-row {
+      display: flex;
+      gap: 10px;
+      overflow-x: auto;
+      padding-bottom: 10px;
+      margin-bottom: 1rem;
+      scrollbar-width: thin;
+    }
+
+    .day-card {
+      min-width: 60px;
+      padding: 10px;
+      background: var(--glass);
+      border-radius: 10px;
+      text-align: center;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+
+    .day-card.selected {
+      background: var(--success);
+      box-shadow: 0 0 15px rgba(56, 161, 105, 0.4);
+    }
+
+    .day-card .num { font-weight: bold; font-size: 1.1rem; }
+    .day-card .name { font-size: 0.75rem; opacity: 0.8; }
+
+    /* شبكة الأوقات - 3 صفوف */
+    .slots-grid {
+      display: grid;
+      grid-template-rows: repeat(3, 1fr);
+      grid-auto-flow: column;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 5px 0;
+    }
+
+    .slot-btn {
+      background: rgba(46, 161, 132, 0.15);
+      border: 1px solid rgba(46, 161, 132, 0.3);
+      color: #9ae6b4;
+      padding: 8px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      white-space: nowrap;
+      text-align: center;
+      min-width: 90px;
+    }
+
+    .slot-btn.selected { background: var(--success); color: white; }
+    .slot-btn.booked { background: rgba(255, 90, 102, 0.1); border-color: var(--booked); color: var(--booked); cursor: not-allowed; }
+
+    /* المدة */
+    .durations-row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .duration-btn {
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap:6px;
+      flex: 1;
+      padding: 10px;
+      background: var(--glass);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      text-align: center;
+      cursor: pointer;
+      font-size: 0.85rem;
+      min-width:110px;
+      box-sizing:border-box;
+    }
+    .duration-btn .label{font-weight:700}
+    .duration-btn .price-block{display:flex;gap:8px;align-items:center}
+    .duration-btn .orig-price{position:relative;color:#e6e6e6;padding:0 6px}
+    .duration-btn .orig-price::after{content:'';position:absolute;left:-6px;right:-6px;top:50%;height:2px;background:linear-gradient(90deg,transparent,#e63946,transparent);transform:rotate(-15deg)}
+    .duration-btn .discounted-price{color:#fff;font-weight:800}
+    .duration-btn .badge{background:#e63946;color:#fff;padding:3px 6px;border-radius:6px;font-size:0.75rem;margin-right:6px}
+    .duration-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(255, 183, 3, 0.06); box-shadow: 0 6px 20px rgba(255,183,3,0.03)}
+
+    /* الملخص */
+    .summary-box {
+      background: rgba(0,0,0,0.2);
+      padding: 1rem;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      border-right: 4px solid var(--accent);
+    }
+
+    .summary-item { margin-bottom: 5px; display: flex; justify-content: space-between; }
+    .price-tag { color: var(--accent); font-weight: bold; font-size: 1.2rem; }
+
+    .submit-btn {
+      background: var(--accent);
+      color: #000;
+      border: none;
+      padding: 1rem;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 1.1rem;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+
+    .submit-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Small device tweaks (keep your desktop sizes intact) */
+    @media (max-width: 900px) {
+      .container { max-width: 100%; padding: 12px; }
+      .hero { padding: 1.2rem; }
+    }
+
+    @media (max-width: 700px) {
+      .form-row { grid-template-columns: 1fr; }
+      .hero { padding: 1rem; }
+
+      /* make slots flow vertically in a compact grid on small screens */
+      .slots-grid { grid-auto-flow: row; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; overflow-x: visible; }
+      .slot-btn { min-width: unset; width: 100%; }
+
+      /* days and durations adjustments for narrow screens */
+      .days-row { gap: 8px; }
+      .duration-btn { flex: unset; width: 48%; }
+      .submit-btn { width: 100%; }
+    }
+
+    @media (max-width: 420px) {
+      .slots-grid { grid-template-columns: repeat(2, 1fr); }
+      .duration-btn { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="hero">
+    <h1>حجز ملعب - نِسيج ⚽</h1>
+    <p>نظام حجز الملاعب الذكي - اختر موعدك المفضل</p>
+    <div id="promoBanner" style="display:block;margin-top:8px;padding:8px;border-radius:8px;background:linear-gradient(90deg,#e63946,#ffbaba);color:#fff;font-weight:700;text-align:center">عرض خاص: ساعة ونصف بسعر 10 د، ساعتان بسعر 15 د</div>
+
+    <form class="booking-form" id="bookingForm">
+      <div class="form-row">
+        <div class="field-group">
+          <label>الاسم</label>
+          <input type="text" id="userName" placeholder="محمد علي" required>
+        </div>
+        <div class="field-group">
+          <label>رقم الهاتف</label>
+          <input type="tel" id="userPhone" placeholder="0770XXXXXXX" required>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <label>المدة</label>
+        <div class="durations-row" id="durationOptions">
+          <div class="duration-btn" data-mins="60" data-price="10">ساعة واحدة</div>
+          <div class="duration-btn" data-mins="90" data-price="15">ساعة ونصف</div>
+          <div class="duration-btn" data-mins="120" data-price="20">ساعتان</div>
+        </div>
+      </div>
+
+      <div class="calendar-section">
+        <div class="month-nav">
+          <button type="button" id="prevW">السابق</button>
+          <span id="monthName">يناير 2026</span>
+          <button type="button" id="nextW">التالي</button>
+        </div>
+        
+        <div class="days-row" id="daysRow"></div>
+        
+        <label style="display:block; margin-bottom:10px;">الأوقات المتاحة:</label>
+        <div class="slots-grid" id="slotsGrid"></div>
+      </div>
+
+      <div class="summary-box">
+        <div class="summary-item"><span>التكلفة:</span> <span class="price-tag" id="resPrice">--</span></div>
+        <div class="summary-item"><span>الموعد:</span> <span id="resDate">--</span></div>
+        <div class="summary-item"><span>نهاية الحجز:</span> <span id="resEnd">--</span></div>
+      </div>
+
+      <button type="submit" class="submit-btn" id="subBtn" disabled>احجز الآن</button>
+    </form>
+  </div>
+</div>
+
+<script>
+  let selectedDate = "";
+  let selectedTime = "";
+  let selectedPrice = 0;
+  let selectedMins = 0;
+  let currentDate = new Date();
+
+  // العروض الثابتة: طبق العرض المحدد (ساعة ونصف = 10 د، ساعتان = 15 د)
+  const promotions = { '90': 10, '120': 15 };
+
+  function decorateDurations(){
+    document.querySelectorAll('.duration-btn').forEach(btn=>{
+      const mins = Number(btn.dataset.mins);
+      const base = Number(btn.dataset.price);
+      const label = btn.textContent.trim();
+      if(promotions[mins]){
+        btn.innerHTML = `<div class="label">${label}</div><div class="price-block"><span class="orig-price">${base} د</span><span class="discounted-price">${promotions[mins]} د <span class="badge">عرض خاص</span></span></div>`;
+      } else {
+        btn.innerHTML = `<div class="label">${label}</div><div class="price-block"><span class="discounted-price">${base} د</span></div>`;
+      }
+    });
+  }
+  // decorate once with the fixed promotions
+  decorateDurations();
+
+  const monthNames = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+
+  const daysRow = document.getElementById('daysRow');
+  const slotsGrid = document.getElementById('slotsGrid');
+  const resPrice = document.getElementById('resPrice');
+  const resDate = document.getElementById('resDate');
+  const resEnd = document.getElementById('resEnd');
+  const subBtn = document.getElementById('subBtn');
+
+  // إنشاء الأيام
+  function renderDays(date) {
+    daysRow.innerHTML = '';
+    for (let i = -2; i < 8; i++) {
+      let d = new Date(date);
+      d.setDate(d.getDate() + i);
+      let dayCard = document.createElement('div');
+      dayCard.className = 'day-card';
+      let dStr = d.toISOString().split('T')[0];
+      if(dStr === selectedDate) dayCard.classList.add('selected');
+
+      dayCard.innerHTML = `
+        <div class="name">${d.toLocaleDateString('ar-EG', {weekday:'short'})}</div>
+        <div class="num">${d.getDate()}</div>
+      `;
+      dayCard.onclick = () => {
+        selectedDate = dStr;
+        renderDays(date);
+        renderSlots();
+        updateSummary();
+      };
+      daysRow.appendChild(dayCard);
+    }
+    // عرض اسم الشهر للسنة بناءً على التاريخ الممرر (مركز الأسبوع)
+    document.getElementById('monthName').textContent = monthNames[date.getMonth()] + ' ' + date.getFullYear();
+  }
+
+  // إنشاء الأوقات (3 صفوف)
+  function renderSlots() {
+    slotsGrid.innerHTML = '';
+    if(!selectedDate){
+      slotsGrid.innerHTML = '<div style="opacity:0.7">اختر يومًا لعرض الأوقات المتاحة</div>';
+      return;
+    }
+    // جلب الأوقات المتاحة من السيرفر
+    fetch('/api/slots?date=' + selectedDate).then(r=>r.json()).then(list=>{
+      list.forEach(s => {
+        const btn = document.createElement('div');
+        btn.className = 'slot-btn';
+        btn.textContent = formatAMPM(Number(s.time.split(':')[0]), Number(s.time.split(':')[1]));
+        if(!s.available){ btn.classList.add('booked'); }
+        if(s.time === selectedTime) btn.classList.add('selected');
+        if(s.available){ btn.onclick = () => { selectedTime = s.time; renderSlots(); updateSummary(); }; }
+        slotsGrid.appendChild(btn);
+      });
+    }).catch(err=>{
+      // في حال فشل السيرفر، اعرض الأوقات محلياً
+      for (let h = 8; h <= 23; h++) {
+        [0, 30].forEach(m => {
+          let time = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+          let btn = document.createElement('div');
+          btn.className = 'slot-btn';
+          btn.textContent = formatAMPM(h, m);
+          if(time === selectedTime) btn.classList.add('selected');
+          btn.onclick = () => { selectedTime = time; renderSlots(); updateSummary(); };
+          slotsGrid.appendChild(btn);
+        });
+      }
+      // add midnight slot
+      const midnightBtn = document.createElement('div'); midnightBtn.className='slot-btn'; midnightBtn.textContent = formatAMPM(0,0); midnightBtn.onclick = ()=>{ selectedTime='00:00'; renderSlots(); updateSummary(); }; slotsGrid.appendChild(midnightBtn);
+    });
+  }
+
+  function formatAMPM(h, m) {
+    let ampm = h >= 12 ? 'م' : 'ص';
+    let hour = h % 12 || 12;
+    return `${hour}:${m.toString().padStart(2, '0')} ${ampm}`;
+  }
+
+  // المدة
+  document.querySelectorAll('.duration-btn').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('.duration-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      selectedMins = parseInt(btn.dataset.mins);
+      const base = Number(btn.dataset.price);
+      selectedPrice = promotions[selectedMins] ? promotions[selectedMins] : base;
+      updateSummary();
+    };
+  });
+
+  function updateSummary() {
+    if(!selectedPrice) resPrice.textContent = '--';
+    else {
+      const base = selectedMins ? Number(document.querySelector(`.duration-btn[data-mins="${selectedMins}"]`).dataset.price) : null;
+      if(base && promotions[selectedMins]){
+        resPrice.innerHTML = `<span style="font-weight:800;color:#ffd700">${selectedPrice} دينار</span> <span style="margin-right:10px;color:#e63946;text-decoration:line-through;opacity:0.9">${base} د</span> <span style="background:#e63946;color:#fff;padding:2px 6px;border-radius:6px;font-size:0.8rem">عرض خاص</span>`;
+      } else {
+        resPrice.textContent = selectedPrice + ' دينار';
+      }
+    }
+
+    resDate.textContent = (selectedDate && selectedTime) ? `${selectedDate} في ${selectedTime}` : "--";
+    
+    if(selectedTime && selectedMins) {
+      let [h, m] = selectedTime.split(':').map(Number);
+      let date = new Date();
+      date.setHours(h, m + selectedMins);
+      resEnd.textContent = formatAMPM(date.getHours(), date.getMinutes());
+    }
+
+    subBtn.disabled = !(selectedDate && selectedTime && selectedMins && document.getElementById('userName').value);
+  }
+
+  document.getElementById('prevW').onclick = () => { currentDate.setDate(currentDate.getDate() - 7); renderDays(currentDate); };
+  document.getElementById('nextW').onclick = () => { currentDate.setDate(currentDate.getDate() + 7); renderDays(currentDate); };
+
+  // إرسال الحجز إلى السيرفر
+  document.getElementById('bookingForm').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const name = document.getElementById('userName').value.trim();
+    const phone = document.getElementById('userPhone').value.trim();
+    if(!name || !phone || !selectedDate || !selectedTime || !selectedMins) return alert('اكمل الحقول المطلوبة');
+    const payload = { name, phone, date: selectedDate, time: selectedTime, duration: selectedMins, price: selectedPrice };
+    try{
+      const r = await fetch('/api/bookings', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify(payload) });
+      const data = await r.json();
+      if(r.status === 409) { alert('هذا الوقت محجوز، اختر وقتًا آخر'); renderSlots(); return; }
+      if(!r.ok) { alert('خطأ: ' + (data.error || 'فشل الاتصال')); return; }
+      alert('تم الحجز بنجاح');
+      // مسح الاختيارات
+      selectedTime = ''; selectedDate = ''; selectedPrice = 0; selectedMins = 0;
+      document.getElementById('userName').value=''; document.getElementById('userPhone').value='';
+      renderDays(currentDate); renderSlots(); updateSummary();
+    }catch(err){ alert('فشل الاتصال بالسيرفر'); }
+  });
+
+  renderDays(currentDate);
+  renderSlots();
+</script>
+
+</body>
+</html>

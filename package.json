@@ -1,0 +1,17 @@
+{
+  "name": "nasij-booking",
+  "version": "0.1.0",
+  "description": "Simple booking backend for Nasiij with SQLite and admin UI",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "bcrypt": "^5.1.0",
+    "chart.js": "^4.4.0",
+    "express": "^4.18.2",
+    "express-session": "^1.17.3",
+    "sqlite3": "^5.1.6"
+  }
+}
