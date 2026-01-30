@@ -269,6 +269,14 @@
       margin-top:8px;
       background:#fff;color:#000;padding:8px 12px;border-radius:8px;border:none;cursor:pointer;
     }
+
+    /* IBAN block inside modal */
+    .iban-block { margin-top: 10px; color: var(--text); text-align: center; }
+    .iban-row { display:flex; gap:8px; align-items:center; justify-content:center; margin-top:6px; }
+    .iban-row .iban-text { background: rgba(255,255,255,0.03); padding:8px 10px; border-radius:8px; font-family: monospace; letter-spacing: 1px; }
+    .iban-row .copy-btn { background:#1a73e8; color:#fff; border:none; padding:8px 10px; border-radius:8px; cursor:pointer; }
+    .iban-msg { margin-top:6px; color:#a8e6a1; font-weight:700; font-size:0.9rem; opacity:0; transform:translateY(4px); transition:opacity 180ms, transform 180ms; }
+    .iban-msg.show { opacity:1; transform:translateY(0); }
   </style>
 </head>
 <body>
@@ -592,12 +600,42 @@
     if(e.target === overlay || e.target.classList.contains('modal-close')) hidePaymentModal();
   });
 
+  // copy IBAN handler
+  const copyBtn = document.getElementById('copyIbanBtn');
+  const ibanTextEl = document.getElementById('ibanText');
+  const ibanMsg = document.getElementById('ibanMsg');
+  async function showIbanMsg(){ if(!ibanMsg) return; ibanMsg.classList.add('show'); setTimeout(()=>ibanMsg.classList.remove('show'), 1500); }
+  if(copyBtn && ibanTextEl){
+    copyBtn.onclick = async ()=>{
+      const txt = ibanTextEl.textContent.trim();
+      try{
+        await navigator.clipboard.writeText(txt);
+        showIbanMsg();
+      }catch(e){
+        // fallback
+        try{ const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); showIbanMsg(); }catch(err){ alert('فشل النسخ — انسخ الآيبان يدوياً'); }
+      }
+    };
+    ibanTextEl.style.cursor = 'pointer';
+    ibanTextEl.onclick = ()=>{ copyBtn.click(); };
+  }
+
 </script>
 
 <!-- Payment Modal -->
 <div id="paymentModal" class="modal-overlay" role="dialog" aria-modal="true" aria-label="نافذة الدفع">
   <div class="modal-card">
     <img src="https://raw.githubusercontent.com/banijamrahclub/menbaralba/d07dc8f9872d6254f5238d5c84f2c72868cac8ad/WhatsApp%20Image%202026-01-30%20at%2011.08.09%20PM.jpeg" alt="تفاصيل الدفع">
+
+    <div class="iban-block">
+      <div style="font-weight:700">رقم الحساب (آيبان)</div>
+      <div class="iban-row">
+        <div id="ibanText" class="iban-text">BH02SCBLBHD01530339701</div>
+        <button id="copyIbanBtn" class="copy-btn">نسخ</button>
+      </div>
+      <div id="ibanMsg" class="iban-msg" aria-hidden="true">تم النسخ</div>
+    </div>
+
     <div style="margin-top:8px">
       <button class="modal-close">إغلاق</button>
     </div>
