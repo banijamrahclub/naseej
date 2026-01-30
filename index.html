@@ -228,6 +228,47 @@
       .slots-grid { grid-template-columns: repeat(2, 1fr); }
       .duration-btn { width: 100%; }
     }
+    
+    /* Modal for payment image (animated & smaller) */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      background: rgba(0,0,0,0);
+      opacity: 0;
+      pointer-events: none;
+      transition: background 200ms ease, opacity 200ms ease;
+    }
+    .modal-overlay.show {
+      background: rgba(0,0,0,0.6);
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .modal-card {
+      max-width: 640px;
+      width: min(86%, 640px);
+      background: #0f1720;
+      padding: 10px;
+      border-radius: 10px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+      border: 1px solid rgba(255,255,255,0.06);
+      text-align: center;
+      transform: translateY(10px) scale(0.98);
+      opacity: 0;
+      transition: transform 220ms cubic-bezier(.2,.9,.3,1), opacity 220ms ease;
+    }
+    .modal-overlay.show .modal-card {
+      transform: translateY(0) scale(1);
+      opacity: 1;
+    }
+    .modal-card img { max-width: 100%; height: auto; border-radius: 6px; display:block; margin: 0 auto; transform-origin:center center; }
+    .modal-close {
+      margin-top:8px;
+      background:#fff;color:#000;padding:8px 12px;border-radius:8px;border:none;cursor:pointer;
+    }
   </style>
 </head>
 <body>
@@ -289,7 +330,10 @@
         <div class="summary-item"><span>نهاية الحجز:</span> <span id="resEnd">--</span></div>
       </div>
 
-      <button type="submit" class="submit-btn" id="subBtn" disabled>احجز الآن</button>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button type="submit" class="submit-btn" id="subBtn" disabled>احجز الآن</button>
+        <button type="button" id="payNowBtn" class="submit-btn" style="background:#1a73e8;color:#fff">الدفع الآن</button>
+      </div>
     </form>
 
     <div class="calendar-section" style="margin-top:1rem">
@@ -468,7 +512,11 @@
       const div = document.createElement('div'); div.style.padding='8px'; div.style.borderBottom='1px solid rgba(255,255,255,0.03)';
       const canCancel = (function(){ const dt = new Date(`${r.date}T${r.time}:00`); return dt.getTime() > Date.now(); })();
       div.innerHTML = `<div style="font-weight:700">${r.date} ${r.time} · ${r.duration} د</div><div style="opacity:0.9">${r.name} — ${r.phone}</div>`;
+      // زر الإلغاء إذا كان مسموحًا
       if(canCancel){ const b = document.createElement('button'); b.textContent='إلغاء'; b.style.marginTop='6px'; b.onclick = async ()=>{ if(!confirm('هل تريد إلغاء هذا الحجز؟'))return; const res = await fetch('/api/bookings/'+r.id+'/cancel',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({phone:document.getElementById('myCountryCode').value + document.getElementById('myPhone').value.replace(/\D/g,'')})}); const data = await res.json(); if(res.ok){ alert('تم الإلغاء'); loadMyBookings(); renderDays(currentDate); renderSlots(); } else alert('فشل: '+(data.error||'غير متوقع')); }; div.appendChild(b); }
+      // زر الدفع — يظهر لكل حجز لفتح نافذة الدفع
+      const payBtn = document.createElement('button'); payBtn.textContent='دفع'; payBtn.style.marginTop='6px'; payBtn.style.marginLeft='8px'; payBtn.style.background='#1a73e8'; payBtn.style.color='#fff'; payBtn.onclick = ()=>{ showPaymentModal(); };
+      div.appendChild(payBtn);
       container.appendChild(div);
     });
   }
@@ -523,7 +571,38 @@
 
   renderDays(currentDate);
   renderSlots();
+
+  // Payment modal logic
+  const payNowBtn = document.getElementById('payNowBtn');
+  function showPaymentModal() {
+    const overlay = document.getElementById('paymentModal');
+    overlay.classList.add('show');
+  }
+  function hidePaymentModal() {
+    const overlay = document.getElementById('paymentModal');
+    overlay.classList.remove('show');
+  }
+  if(payNowBtn){
+    payNowBtn.onclick = showPaymentModal;
+  }
+  // close when clicking overlay or close button
+  document.addEventListener('click', (e)=>{
+    const overlay = document.getElementById('paymentModal');
+    if(!overlay) return;
+    if(e.target === overlay || e.target.classList.contains('modal-close')) hidePaymentModal();
+  });
+
 </script>
+
+<!-- Payment Modal -->
+<div id="paymentModal" class="modal-overlay" role="dialog" aria-modal="true" aria-label="نافذة الدفع">
+  <div class="modal-card">
+    <img src="https://raw.githubusercontent.com/banijamrahclub/menbaralba/d07dc8f9872d6254f5238d5c84f2c72868cac8ad/WhatsApp%20Image%202026-01-30%20at%2011.08.09%20PM.jpeg" alt="تفاصيل الدفع">
+    <div style="margin-top:8px">
+      <button class="modal-close">إغلاق</button>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>
