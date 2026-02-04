@@ -383,7 +383,7 @@
     }
     $('loadBtn').onclick = loadBookings;
 
-    const staticPromos = { '60':10, '90':10, '120':15 };
+    const staticPromos = { '60':10, '90':15, '120':20 };
     $('mDur').onchange = function(){ $('mPrice').value = staticPromos[this.value] || ''; };
     $('mPrice').value = staticPromos[$('mDur').value] || '';
 
@@ -398,7 +398,8 @@
       const date = $('mDate').value;
       const time = $('mTime').value;
       const duration = Number($('mDur').value);
-      const price = Number($('mPrice').value) || 0;
+      const price = Number(staticPromos[String(duration)]) || 0;
+
 
       if(!name || !date || !time) return alert('اكمل البيانات');
 
@@ -891,7 +892,7 @@
       let cum = 0;
 
       sorted.forEach(b=>{
-        cum += Number(b.price||0);
+cum += (Number(staticPromos[String(b.duration)]) || 0);
         const label = `${b.date} ${b.time||''}`.trim();
         labels.push(label);
         values.push(cum);
@@ -916,7 +917,10 @@
       const varExpInRange = varExpAll.filter(e => inRange(e.date, from, to));
 
       // Booking income total
-      const bookingIncomeTotal = bookings.reduce((s,b)=> s + Number(b.price||0), 0);
+const bookingIncomeTotal = bookings.reduce(
+  (s,b)=> s + (Number(staticPromos[String(b.duration)]) || 0),
+  0
+);
 
       // Fixed income/expense totals within months range
       const fiMap = fixedIncomeMonthlyMap(from, to);
@@ -936,7 +940,13 @@
       $('kpiNet').style.color = net >= 0 ? '#7CFFB2' : '#FF6B6B';
 
       // Monthly: booking + fixed
-      const miBookings = sumByMonth(bookings, b=>b.date, b=>b.price, from, to);
+const miBookings = sumByMonth(
+  bookings,
+  b=>b.date,
+  b=> (Number(staticPromos[String(b.duration)]) || 0),
+  from,
+  to
+);
       const meVar = sumByMonth(varExpInRange, e=>e.date, e=>e.amount, from, to);
 
       // unify months
