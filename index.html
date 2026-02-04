@@ -204,6 +204,12 @@
 
     .submit-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
+    /* My bookings responsive base */
+    .my-bookings-row { display:flex; gap:8px; align-items:center; }
+    .my-bookings-row .my-phone-input { flex:1 1 180px; min-width:0; padding:8px; border-radius:8px; border:1px solid rgba(255,255,255,0.1); background:var(--glass); color:var(--text); }
+    .my-bookings-row .my-country-select { flex: 0 0 auto; min-width:110px; }
+    .my-bookings-row .my-load-btn { flex: 0 0 auto; }
+
     /* Small device tweaks (keep your desktop sizes intact) */
     @media (max-width: 900px) {
       .container { max-width: 100%; padding: 12px; }
@@ -222,6 +228,12 @@
       .days-row { gap: 8px; }
       .duration-btn { flex: unset; width: 48%; }
       .submit-btn { width: 100%; }
+
+      /* Stack and stretch inputs in 'حجوزاتي' row on small screens */
+      .my-bookings-row { flex-wrap:wrap; }
+      .my-bookings-row .my-country-select { width: 100%; max-width: 160px; }
+      .my-bookings-row .my-phone-input { width: 100%; margin-top:6px; }
+      .my-bookings-row .my-load-btn { width: 100%; margin-left:0; margin-top:6px; }
     }
 
     @media (max-width: 420px) {
@@ -270,6 +282,17 @@
       background:#fff;color:#000;padding:8px 12px;border-radius:8px;border:none;cursor:pointer;
     }
 
+
+
+    /* Gallery modal */
+    .gallery-img { max-width:100%; height:auto; border-radius:6px; display:block; margin:0 auto; }
+    .gallery-nav { display:flex; gap:8px; justify-content:space-between; align-items:center; margin-top:8px; }
+    .gallery-arrow { background:transparent;border:none;color:#fff;font-size:1.6rem;padding:6px 10px;cursor:pointer; }
+    .gallery-thumbs { display:flex; gap:6px; overflow-x:auto; margin-top:8px; justify-content:center; padding-bottom:6px; }
+    .gallery-thumb { width:72px;height:48px; object-fit:cover; border-radius:6px; opacity:0.7; cursor:pointer; border:2px solid transparent; }
+    .gallery-thumb.active { opacity:1; border-color:var(--accent); }
+    @media (max-width:700px){ .gallery-thumb{width:56px;height:40px;} }
+
     /* IBAN block inside modal */
     .iban-block { margin-top: 10px; color: var(--text); text-align: center; }
     .iban-row { display:flex; gap:8px; align-items:center; justify-content:center; margin-top:6px; }
@@ -285,7 +308,12 @@
   <div class="hero">
     <h1>حجز ملعب - نِسيج ⚽</h1>
     <p>نظام حجز الملاعب الذكي - اختر موعدك المفضل</p>
-    <div id="promoBanner" style="display:block;margin-top:8px;padding:8px;border-radius:8px;background:linear-gradient(90deg,#e63946,#ffbaba);color:#fff;font-weight:700;text-align:center">عرض خاص: ساعة ونصف بسعر 10 د، ساعتان بسعر 15 د</div>
+    <div style="text-align:center;margin-top:10px">
+      <button type="button" id="showGalleryBtn" class="submit-btn" style="background:#374151;color:#fff;display:inline-block;padding:8px 14px">عرض صور الملعب</button>
+    </div>
+
+
+
 
     <form class="booking-form" id="bookingForm">
       <div class="form-row">
@@ -346,8 +374,8 @@
 
     <div class="calendar-section" style="margin-top:1rem">
       <h3 style="margin:0 0 8px 0">حجوزاتي</h3>
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
-        <select id="myCountryCode" style="min-width:110px;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:var(--glass);color:var(--text)">
+      <div class="my-bookings-row" style="margin-bottom:8px;">
+        <select id="myCountryCode" class="my-country-select" style="min-width:110px;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:var(--glass);color:var(--text)">
           <option value="+973" selected>+973 البحرين</option>
           <option value="+964">+964 العراق</option>
           <option value="+966">+966 السعودية</option>
@@ -356,8 +384,8 @@
           <option value="+965">+965 الكويت</option>
           <option value="+963">+963 سوريا</option>
         </select>
-        <input type="tel" id="myPhone" placeholder="770XXXXXXX" style="flex:1;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:var(--glass);color:var(--text)">
-        <button type="button" id="loadMy" class="submit-btn" style="padding:8px 12px;margin-left:8px">عرض حجوزاتي</button>
+        <input type="tel" id="myPhone" class="my-phone-input" placeholder="770XXXXXXX" style="flex:1;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:var(--glass);color:var(--text);min-width:0">
+        <button type="button" id="loadMy" class="submit-btn my-load-btn" style="padding:8px 12px;margin-left:8px">عرض حجوزاتي</button>
       </div>
       <div id="myList" style="background:var(--card);padding:8px;border-radius:8px">لا توجد حجوزات</div>
     </div>
@@ -372,19 +400,15 @@
   let selectedMins = 0;
   let currentDate = new Date();
 
-  // العروض الثابتة: طبق العرض المحدد (ساعة ونصف = 10 د، ساعتان = 15 د)
-  const promotions = { '90': 10, '120': 15 };
+  // لا توجد عروض حاليًا
+  const promotions = {}; 
 
   function decorateDurations(){
     document.querySelectorAll('.duration-btn').forEach(btn=>{
       const mins = Number(btn.dataset.mins);
       const base = Number(btn.dataset.price);
       const label = btn.textContent.trim();
-      if(promotions[mins]){
-        btn.innerHTML = `<div class="label">${label}</div><div class="price-block"><span class="orig-price">${base} د</span><span class="discounted-price">${promotions[mins]} د <span class="badge">عرض خاص</span></span></div>`;
-      } else {
-        btn.innerHTML = `<div class="label">${label}</div><div class="price-block"><span class="discounted-price">${base} د</span></div>`;
-      }
+      btn.innerHTML = `<div class="label">${label}</div><div class="price-block"><span class="discounted-price">${base} د.ب</span></div>`;
     });
   }
   // decorate once with the fixed promotions
@@ -489,12 +513,7 @@
   function updateSummary() {
     if(!selectedPrice) resPrice.textContent = '--';
     else {
-      const base = selectedMins ? Number(document.querySelector(`.duration-btn[data-mins="${selectedMins}"]`).dataset.price) : null;
-      if(base && promotions[selectedMins]){
-        resPrice.innerHTML = `<span style="font-weight:800;color:#ffd700">${selectedPrice} دينار</span> <span style="margin-right:10px;color:#e63946;text-decoration:line-through;opacity:0.9">${base} د</span> <span style="background:#e63946;color:#fff;padding:2px 6px;border-radius:6px;font-size:0.8rem">عرض خاص</span>`;
-      } else {
-        resPrice.textContent = selectedPrice + ' دينار';
-      }
+      resPrice.textContent = selectedPrice + ' د.ب';
     }
 
     resDate.textContent = (selectedDate && selectedTime) ? `${selectedDate} في ${selectedTime}` : "--";
@@ -569,6 +588,7 @@
       const myCCEl = document.getElementById('myCountryCode');
       if(myPhoneEl) myPhoneEl.value = phone.replace(/^\+\d{1,3}/,'');
       if(myCCEl) myCCEl.value = phone.slice(0,4) || cc;
+
       // مسح الاختيارات
       selectedTime = ''; selectedDate = ''; selectedPrice = 0; selectedMins = 0;
       document.getElementById('userName').value=''; document.getElementById('userPhone').value='';
@@ -585,6 +605,8 @@
   function showPaymentModal() {
     const overlay = document.getElementById('paymentModal');
     overlay.classList.add('show');
+    // attach copy handlers when modal is shown (elements now exist)
+    setupIbanHandlers();
   }
   function hidePaymentModal() {
     const overlay = document.getElementById('paymentModal');
@@ -600,25 +622,90 @@
     if(e.target === overlay || e.target.classList.contains('modal-close')) hidePaymentModal();
   });
 
-  // copy IBAN handler
-  const copyBtn = document.getElementById('copyIbanBtn');
-  const ibanTextEl = document.getElementById('ibanText');
-  const ibanMsg = document.getElementById('ibanMsg');
-  async function showIbanMsg(){ if(!ibanMsg) return; ibanMsg.classList.add('show'); setTimeout(()=>ibanMsg.classList.remove('show'), 1500); }
-  if(copyBtn && ibanTextEl){
+  // copy IBAN handler - setup function (call after modal exists)
+  function setupIbanHandlers(){
+    const copyBtn = document.getElementById('copyIbanBtn');
+    const ibanTextEl = document.getElementById('ibanText');
+    const ibanMsg = document.getElementById('ibanMsg');
+    if(!copyBtn || !ibanTextEl || !ibanMsg) return;
+    function showIbanMsg(){ ibanMsg.classList.add('show'); ibanMsg.setAttribute('aria-hidden','false'); setTimeout(()=>{ ibanMsg.classList.remove('show'); ibanMsg.setAttribute('aria-hidden','true'); }, 1500); }
     copyBtn.onclick = async ()=>{
       const txt = ibanTextEl.textContent.trim();
       try{
-        await navigator.clipboard.writeText(txt);
+        if(navigator.clipboard && navigator.clipboard.writeText) await navigator.clipboard.writeText(txt);
+        else { const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
         showIbanMsg();
       }catch(e){
-        // fallback
         try{ const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); showIbanMsg(); }catch(err){ alert('فشل النسخ — انسخ الآيبان يدوياً'); }
       }
     };
     ibanTextEl.style.cursor = 'pointer';
     ibanTextEl.onclick = ()=>{ copyBtn.click(); };
   }
+  // attempt to attach handlers on DOMContentLoaded too (if modal already present)
+  document.addEventListener('DOMContentLoaded', setupIbanHandlers);
+
+
+
+
+  // Gallery logic and initialization
+  const galleryImages = [
+    'https://raw.githubusercontent.com/banijamrahclub/w-v/09f32f5fb8dda7fa4be19f26f94c5e3eb86a361e/Screenshot%202026-02-04%20144949.png',
+    'https://raw.githubusercontent.com/banijamrahclub/w-v/09f32f5fb8dda7fa4be19f26f94c5e3eb86a361e/Screenshot%202026-02-04%20145058.png',
+    'https://raw.githubusercontent.com/banijamrahclub/w-v/09f32f5fb8dda7fa4be19f26f94c5e3eb86a361e/Screenshot%202026-02-04%20145143.png',
+    'https://raw.githubusercontent.com/banijamrahclub/w-v/09f32f5fb8dda7fa4be19f26f94c5e3eb86a361e/Screenshot%202026-02-04%20145208.png',
+    'https://raw.githubusercontent.com/banijamrahclub/w-v/09f32f5fb8dda7fa4be19f26f94c5e3eb86a361e/Screenshot%202026-02-04%20145226.png'
+  ];
+  let galleryIndex = 0;
+
+  function renderThumbs(){
+    const container = document.getElementById('galleryThumbs');
+    if(!container) return;
+    container.innerHTML = '';
+    galleryImages.forEach((src,i)=>{
+      const img = document.createElement('img');
+      img.src = src;
+      img.className = 'gallery-thumb';
+      img.onclick = ()=>{ galleryIndex = i; galleryUpdate(); };
+      container.appendChild(img);
+    });
+  }
+
+  function openGallery(at=0){
+    galleryIndex = at;
+    const overlay = document.getElementById('galleryModal');
+    if(!overlay) return;
+    const img = overlay.querySelector('.gallery-main-img');
+    img.src = galleryImages[galleryIndex];
+    updateThumbs();
+    overlay.classList.add('show');
+    document.addEventListener('keydown', galleryKeyHandler);
+  }
+  function closeGallery(){
+    const overlay = document.getElementById('galleryModal');
+    if(!overlay) return;
+    overlay.classList.remove('show');
+    document.removeEventListener('keydown', galleryKeyHandler);
+  }
+  function galleryNext(){ galleryIndex = (galleryIndex+1) % galleryImages.length; galleryUpdate(); }
+  function galleryPrev(){ galleryIndex = (galleryIndex-1 + galleryImages.length) % galleryImages.length; galleryUpdate(); }
+  function galleryUpdate(){ const overlay=document.getElementById('galleryModal'); const img=overlay.querySelector('.gallery-main-img'); img.src = galleryImages[galleryIndex]; updateThumbs(); }
+  function updateThumbs(){ const t = document.querySelectorAll('.gallery-thumb'); t.forEach((el,i)=>{ el.classList.toggle('active', i===galleryIndex); }); }
+  function galleryKeyHandler(e){ if(e.key==='Escape') closeGallery(); if(e.key==='ArrowRight') galleryNext(); if(e.key==='ArrowLeft') galleryPrev(); }
+
+  function attachGalleryButtons(){
+    const nxt = document.getElementById('galleryNext');
+    const prev = document.getElementById('galleryPrev');
+    const showBtn = document.getElementById('showGalleryBtn');
+    if(showBtn) showBtn.onclick = ()=> openGallery(0);
+    if(nxt) nxt.onclick = galleryNext;
+    if(prev) prev.onclick = galleryPrev;
+  }
+
+  document.addEventListener('DOMContentLoaded', ()=>{ renderThumbs(); attachGalleryButtons(); });
+
+  // clicking overlay or close for gallery
+  document.addEventListener('click', (e)=>{ const overlay=document.getElementById('galleryModal'); if(!overlay) return; if(e.target===overlay || e.target.classList.contains('gallery-close')) closeGallery(); });
 
 </script>
 
@@ -638,6 +725,22 @@
 
     <div style="margin-top:8px">
       <button class="modal-close">إغلاق</button>
+    </div>
+  </div>
+</div>
+
+<!-- Gallery Modal -->
+<div id="galleryModal" class="modal-overlay" role="dialog" aria-modal="true" aria-label="معرض صور الملعب">
+  <div class="modal-card">
+    <img class="gallery-main-img gallery-img" src="" alt="صورة الملعب">
+    <div class="gallery-nav">
+      <button class="gallery-arrow" id="galleryPrev" aria-label="السابق">‹</button>
+      <div style="flex:1"></div>
+      <button class="gallery-arrow" id="galleryNext" aria-label="التالي">›</button>
+    </div>
+    <div class="gallery-thumbs" id="galleryThumbs"></div>
+    <div style="margin-top:8px">
+      <button class="gallery-close modal-close">إغلاق</button>
     </div>
   </div>
 </div>
