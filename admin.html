@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>إدارة الحجوزات - نِسيج</title>
+  <title>إدارة الحجوزات + المحاسبة - نِسيج</title>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap" rel="stylesheet">
 
   <!-- Charts -->
@@ -28,33 +28,19 @@
     .timetable-table td.free-cell{background:rgba(255,255,255,0.015);cursor:pointer}
     .timetable-table td.empty{opacity:0.6;color:#cfcfcf}
 
-    @media (max-width:1100px){
-      .timetable{overflow-x:auto}
-      .timetable-table{font-size:0.95rem}
-    }
     @media (max-width:900px){
-      .timetable-table th, .timetable-table td{padding:6px;font-size:0.84rem}
-      #bookingsTable, .timetable-table{display:block; width:100%; overflow-x:auto}
-      .timetable-table th, .timetable-table td{white-space:nowrap}
-      .card > div:first-child{flex-direction:column;align-items:stretch}
-      .card > div:first-child label, .card > div:first-child button{width:100%;margin-bottom:8px}
+      #bookingsTable, .timetable-table, #exTable, #fixIncomeTable, #fixExpTable{display:block;width:100%;overflow-x:auto}
       input, select, button{width:100%;box-sizing:border-box}
-      #detailModal > div{margin:6% 8px; max-width:calc(100% - 16px);}
-      .timetable-table th.time-head, .timetable-table td.time{width:78px}
-    }
-    @media (max-width:420px){
-      .timetable-table th.time-head, .timetable-table td.time{width:60px}
-      .timetable-table th, .timetable-table td{padding:5px;font-size:0.8rem}
-      .duration-btn, #mAdd{width:100%}
     }
   </style>
 </head>
+
 <body>
   <h2>لوحة إدارة الحجوزات</h2>
 
   <div class="card" id="loginCard">
     <label>كلمة المرور:</label>
-    <div style="display:flex;gap:8px;margin-top:8px">
+    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
       <input type="password" id="adminPwd" placeholder="كلمة المرور" />
       <button id="loginBtn">تسجيل دخول</button>
     </div>
@@ -63,8 +49,8 @@
 
   <div class="card" id="adminUI" style="display:none">
 
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
-      <div>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <label>من: <input type="date" id="fromDate" /></label>
         <label>إلى: <input type="date" id="toDate" /></label>
         <button id="loadBtn">تحميل</button>
@@ -85,7 +71,7 @@
     </div>
 
     <div class="card" id="weekView" style="min-height:320px;padding:10px">
-      <div class="timetable" id="timetable">اختر بداية الأسبوع واضغط عرض لعرض جدول أسبوعي أكبر</div>
+      <div class="timetable" id="timetable">—</div>
     </div>
 
     <h3 style="margin-top:12px">جدول الحجوزات</h3>
@@ -101,7 +87,7 @@
     <h3 style="margin-top:12px">أضف حجز يدوي</h3>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
       <input id="mName" placeholder="الاسم" />
-      <select id="mCountry" style="min-width:110px;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);color:#fff">
+      <select id="mCountry" style="min-width:110px">
         <option value="+973" selected>+973 البحرين</option>
         <option value="+964">+964 العراق</option>
         <option value="+966">+966 السعودية</option>
@@ -117,10 +103,9 @@
       <input id="mPrice" placeholder="السعر" />
       <button id="mAdd">أضف</button>
     </div>
+
     <div style="margin-top:8px">
-      <button id="clearAll" style="background:#e63946;color:#fff;padding:6px 10px;border-radius:6px;border:none">
-        حذف جميع الحجوزات
-      </button>
+      <button id="clearAll" class="danger" style="padding:8px 10px;border-radius:8px;border:none">حذف جميع الحجوزات</button>
     </div>
 
     <!-- نافذة تفاصيل الحجز -->
@@ -129,8 +114,8 @@
         <h3>تفاصيل الحجز</h3>
         <div id="modalContent" style="margin-top:8px"></div>
         <div style="text-align:left;margin-top:12px;display:flex;gap:8px;justify-content:flex-end;">
-          <button id="modalCancel" class="danger">إلغاء الحجز</button>
-          <button id="modalClose">إغلاق</button>
+          <button id="modalCancel" class="danger" style="border:none;border-radius:8px;padding:8px 10px">إلغاء الحجز</button>
+          <button id="modalClose" style="border:none;border-radius:8px;padding:8px 10px">إغلاق</button>
         </div>
       </div>
     </div>
@@ -141,7 +126,7 @@
         <h3>أضف حجز يدوي</h3>
         <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
           <input id="addName" placeholder="الاسم" />
-          <select id="addCountry" style="min-width:110px;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);color:#fff">
+          <select id="addCountry" style="min-width:110px">
             <option value="+973" selected>+973 البحرين</option>
             <option value="+964">+964 العراق</option>
             <option value="+966">+966 السعودية</option>
@@ -157,8 +142,8 @@
           <input id="addPrice" placeholder="السعر" />
         </div>
         <div style="text-align:left;margin-top:12px;display:flex;gap:8px;justify-content:flex-end;">
-          <button id="addClose">إغلاق</button>
-          <button id="addSave">أضف</button>
+          <button id="addClose" style="border:none;border-radius:8px;padding:8px 10px">إغلاق</button>
+          <button id="addSave" style="border:none;border-radius:8px;padding:8px 10px">أضف</button>
         </div>
       </div>
     </div>
@@ -182,7 +167,7 @@
           <label>إلى: <input type="date" id="accTo" /></label>
           <button id="accRefresh">تحديث التقارير</button>
           <button id="accExport">تصدير CSV</button>
-          <button id="accReset" class="danger" style="border:none;border-radius:8px;padding:8px 10px">مسح المصروفات</button>
+          <button id="accResetAll" class="danger" style="border:none;border-radius:8px;padding:8px 10px">مسح كل بيانات المحاسبة</button>
         </div>
 
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
@@ -201,7 +186,9 @@
         </div>
       </div>
 
-      <h4 style="margin-top:10px">أضف مصروف</h4>
+      <hr style="border:0;border-top:1px solid rgba(255,255,255,.05);margin:12px 0">
+
+      <h4 style="margin:0 0 8px 0">مصروفات متغيرة (يدوية)</h4>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <input id="exDate" type="date" />
         <input id="exTitle" placeholder="وصف المصروف (مثلاً: طباعة)" />
@@ -214,32 +201,85 @@
           <option value="أخرى">أخرى</option>
         </select>
         <input id="exAmount" type="number" step="0.001" placeholder="المبلغ (د.ب)" />
-        <button id="exAdd">إضافة</button>
+        <button id="exAdd">إضافة مصروف</button>
       </div>
 
-      <h4 style="margin-top:12px">سجل المصروفات</h4>
-      <table id="exTable">
-        <thead>
-          <tr><th>التاريخ</th><th>الوصف</th><th>التصنيف</th><th>المبلغ</th><th></th></tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+      <div style="margin-top:10px">
+        <table id="exTable">
+          <thead><tr><th>التاريخ</th><th>الوصف</th><th>التصنيف</th><th>المبلغ</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
 
-      <h4 style="margin-top:12px">الدخل الشهري والسنوي</h4>
+      <hr style="border:0;border-top:1px solid rgba(255,255,255,.05);margin:12px 0">
+
+      <h4 style="margin:0 0 8px 0">ثوابت شهرية (مدخول ثابت + مصروفات ثابتة)</h4>
+
+      <div class="card" style="margin-top:8px">
+        <div style="opacity:.85;margin-bottom:8px">مدخول ثابت شهري</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <input id="fiTitle" placeholder="وصف (مثلاً: اشتراك شهري)" />
+          <input id="fiStart" type="month" />
+          <input id="fiAmount" type="number" step="0.001" placeholder="المبلغ الشهري (د.ب)" />
+          <button id="fiAdd">إضافة مدخول ثابت</button>
+        </div>
+
+        <div style="margin-top:10px">
+          <table id="fixIncomeTable">
+            <thead><tr><th>يبدأ من</th><th>الوصف</th><th>المبلغ الشهري</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:10px">
+        <div style="opacity:.85;margin-bottom:8px">مصروف ثابت شهري</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <input id="fxTitle" placeholder="وصف (مثلاً: إيجار)" />
+          <select id="fxCat">
+            <option value="إيجار">إيجار</option>
+            <option value="رواتب">رواتب</option>
+            <option value="تشغيل">تشغيل</option>
+            <option value="تسويق">تسويق</option>
+            <option value="معدات">معدات</option>
+            <option value="أخرى">أخرى</option>
+          </select>
+          <input id="fxStart" type="month" />
+          <input id="fxAmount" type="number" step="0.001" placeholder="المبلغ الشهري (د.ب)" />
+          <button id="fxAdd">إضافة مصروف ثابت</button>
+        </div>
+
+        <div style="margin-top:10px">
+          <table id="fixExpTable">
+            <thead><tr><th>يبدأ من</th><th>التصنيف</th><th>الوصف</th><th>المبلغ الشهري</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <hr style="border:0;border-top:1px solid rgba(255,255,255,.05);margin:12px 0">
+
+      <h4 style="margin-top:0">الرسوم البيانية</h4>
+
+      <!-- 1) منحنى يرتفع مع كل حجز (تراكمي) -->
       <div class="row" style="flex-wrap:wrap">
         <div class="card" style="flex:1;min-width:280px">
+          <div style="opacity:.85;margin-bottom:8px">منحنى الدخل التراكمي (يرتفع مع كل حجز)</div>
+          <canvas id="chartBookingCurve"></canvas>
+        </div>
+        <div class="card" style="flex:1;min-width:280px">
+          <div style="opacity:.85;margin-bottom:8px">شهري: دخل/مصروف/صافي</div>
           <canvas id="chartMonthly"></canvas>
         </div>
-        <div class="card" style="flex:1;min-width:280px">
-          <canvas id="chartCurve"></canvas>
-        </div>
       </div>
 
       <div class="row" style="flex-wrap:wrap">
         <div class="card" style="flex:1;min-width:280px">
+          <div style="opacity:.85;margin-bottom:8px">مصروفات حسب التصنيف</div>
           <canvas id="chartExpenseCat"></canvas>
         </div>
         <div class="card" style="flex:1;min-width:280px">
+          <div style="opacity:.85;margin-bottom:8px">سنوي: دخل/مصروف/صافي</div>
           <canvas id="chartYearly"></canvas>
         </div>
       </div>
@@ -253,17 +293,140 @@
   </div>
 
   <script>
+    // ========= Helpers =========
     async function postJson(url, body){
       const r = await fetch(url, {
         method:'POST',
         headers:{'content-type':'application/json'},
         body:JSON.stringify(body),
-        credentials: 'same-origin'
+        credentials:'same-origin'
       });
       return r.json();
     }
+    function $(id){ return document.getElementById(id); }
+    function isoToday(){ return new Date().toISOString().split('T')[0]; }
+    function monthToday(){ return isoToday().slice(0,7); }
+    function escapeHtml(str){
+      return String(str ?? '')
+        .replaceAll('&','&amp;')
+        .replaceAll('<','&lt;')
+        .replaceAll('>','&gt;')
+        .replaceAll('"','&quot;')
+        .replaceAll("'","&#039;");
+    }
 
-    // Helpers: compute week start (Monday) and auto-load current week
+    // ========= Login/Logout =========
+    $('logoutBtn').onclick = async ()=>{
+      if(window.eventS && window.eventS.close) window.eventS.close();
+      await postJson('/api/admin/logout',{});
+      location.reload();
+    };
+
+    $('loginBtn').onclick = async ()=>{
+      const pwd = $('adminPwd').value;
+      try{
+        const res = await postJson('/api/admin/login',{password:pwd});
+        if(res && res.ok){
+          $('loginCard').style.display='none';
+          $('adminUI').style.display='block';
+
+          await loadBookings();
+          await postLoginInit();
+
+          initAccountingDefaults();
+          renderAllAccountingTables();
+          await accRefresh();
+        }else{
+          $('loginMsg').textContent = 'كلمة مرور خاطئة';
+        }
+      }catch(e){
+        console.error(e);
+        $('loginMsg').textContent = 'فشل الاتصال بالخادم';
+      }
+    };
+
+    // ========= Bookings =========
+    async function fetchBookingsRange(from, to){
+      const q = (from && to) ? `?from=${from}&to=${to}` : '';
+      const res = await fetch('/api/bookings' + q, { credentials:'same-origin' });
+      if(res.status===401) throw new Error('غير مصرح');
+      return res.json();
+    }
+
+    async function loadBookings(){
+      const from = $('fromDate').value || '';
+      const to = $('toDate').value || '';
+      const q = (from && to) ? `?from=${from}&to=${to}` : '';
+      const res = await fetch('/api/bookings'+q, { credentials:'same-origin' });
+      if(res.status===401){ alert('غير مصرح'); return; }
+      const rows = await res.json();
+
+      const tbody = document.querySelector('#bookingsTable tbody');
+      tbody.innerHTML='';
+
+      rows.forEach(r=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${escapeHtml(r.name)}</td>
+          <td>${escapeHtml(r.phone)}</td>
+          <td>${r.date}</td>
+          <td>${r.time}</td>
+          <td>${r.duration}</td>
+          <td>${r.price}</td>
+          <td><button class="details" data-id="${r.id}">تفاصيل</button></td>
+        `;
+        tbody.appendChild(tr);
+        tr.querySelector('.details').onclick = ()=> openModal(r);
+      });
+
+      try{ await accRefresh(); }catch(e){}
+    }
+    $('loadBtn').onclick = loadBookings;
+
+    const staticPromos = { '60':10, '90':10, '120':15 };
+    $('mDur').onchange = function(){ $('mPrice').value = staticPromos[this.value] || ''; };
+    $('mPrice').value = staticPromos[$('mDur').value] || '';
+
+    $('mAdd').onclick = async ()=>{
+      const name = $('mName').value.trim();
+      const cc = $('mCountry').value || '+973';
+      let phoneRaw = $('mPhone').value.trim();
+      let digits = phoneRaw.replace(/\D/g,'');
+      if(!digits) return alert('ادخل رقم هاتف صحيح');
+      let phone = digits.startsWith('0') ? cc + digits.replace(/^0+/, '') : cc + digits;
+
+      const date = $('mDate').value;
+      const time = $('mTime').value;
+      const duration = Number($('mDur').value);
+      const price = Number($('mPrice').value) || 0;
+
+      if(!name || !date || !time) return alert('اكمل البيانات');
+
+      const res = await postJson('/api/bookings',{name,phone,date,time,duration,price});
+      if(res && res.error) alert('فشل: '+res.error);
+      else{
+        alert('تمت الإضافة');
+        await loadBookings();
+        const wkStart = $('weekStart').value;
+        if(wkStart) $('weekLoad').click();
+      }
+    };
+
+    $('clearAll').onclick = async ()=>{
+      if(!confirm('هل أنت متأكد؟ سيتم حذف كل الحجوزات نهائياً')) return;
+      const r = await fetch('/api/bookings/all', { method:'DELETE', credentials:'same-origin' });
+      const data = await r.json().catch(()=>({}));
+      if(r.ok){
+        alert('تم حذف جميع الحجوزات');
+        await loadBookings();
+        const wkStart = $('weekStart').value;
+        if(wkStart) $('weekLoad').click();
+      }else{
+        alert('فشل: '+(data.error||'غير متوقع'));
+      }
+    };
+
+    // ========= Week view =========
     function getWeekStartFor(d){
       const dt = new Date(d);
       const day = dt.getDay(); // 0 Sun .. 6 Sat
@@ -271,186 +434,45 @@
       dt.setDate(dt.getDate() + diff);
       return dt.toISOString().split('T')[0];
     }
-
     function setCurrentWeekAndLoad(){
       const ws = getWeekStartFor(new Date());
-      const el = document.getElementById('weekStart');
-      const label = document.getElementById('weekLabel');
-      if(el.value !== ws){
-        el.value = ws;
-        document.getElementById('weekLoad').click();
-      }
-      if(label) label.textContent = 'الأسبوع من ' + ws;
+      $('weekStart').value = ws;
+      $('weekLabel').textContent = 'الأسبوع من ' + ws;
+      $('weekLoad').click();
     }
 
-    function startWeekWatcher(){
-      if(window._weekWatcher) return;
-      window._weekWatcher = setInterval(()=>{
-        const ws = getWeekStartFor(new Date());
-        const el = document.getElementById('weekStart');
-        if(el && el.value !== ws){
-          el.value = ws;
-          document.getElementById('weekLoad').click();
-        }
-      }, 60*1000);
-    }
-
-    // =====================
-    // Login / Logout
-    // =====================
-    document.getElementById('logoutBtn').onclick = async ()=>{
-      if(window.eventS && window.eventS.close) window.eventS.close();
-      await postJson('/api/admin/logout',{});
-      location.reload();
+    $('weekToday').onclick = ()=> setCurrentWeekAndLoad();
+    $('weekPrev').onclick = ()=>{
+      let d = new Date($('weekStart').value || getWeekStartFor(new Date()));
+      d.setDate(d.getDate()-7);
+      $('weekStart').value = d.toISOString().split('T')[0];
+      $('weekLabel').textContent = 'الأسبوع من ' + $('weekStart').value;
+      $('weekLoad').click();
+    };
+    $('weekNext').onclick = ()=>{
+      let d = new Date($('weekStart').value || getWeekStartFor(new Date()));
+      d.setDate(d.getDate()+7);
+      $('weekStart').value = d.toISOString().split('T')[0];
+      $('weekLabel').textContent = 'الأسبوع من ' + $('weekStart').value;
+      $('weekLoad').click();
     };
 
-    // Login (final handler)
-    document.getElementById('loginBtn').onclick = async function(){
-      const pwd = document.getElementById('adminPwd').value;
-      try{
-        const res = await postJson('/api/admin/login',{password:pwd});
-        if(res && res.ok){
-          document.getElementById('loginCard').style.display='none';
-          document.getElementById('adminUI').style.display='block';
-
-          // Load bookings + init realtime + week
-          await loadBookings();
-          await postLoginInit();
-
-          // Init accounting UI defaults + refresh
-          initAccountingDefaults();
-          await accRefresh();
-
-        } else {
-          document.getElementById('loginMsg').textContent = res && res.error ? ('خطأ: '+res.error) : 'كلمة مرور خاطئة';
-        }
-      }catch(err){
-        console.error('login error', err);
-        document.getElementById('loginMsg').textContent =
-          'فشل الاتصال بالخادم. تأكد أن السيرفر يعمل وفتح الصفحة عبر http://localhost:3000/admin.html';
-      }
-    };
-
-    // =====================
-    // Bookings
-    // =====================
-    async function loadBookings(){
-      const from = document.getElementById('fromDate').value || '';
-      const to = document.getElementById('toDate').value || '';
-      const q = (from && to) ? `?from=${from}&to=${to}` : '';
-      const res = await fetch('/api/bookings' + q, { credentials:'same-origin' });
-      if(res.status===401){ alert('غير مصرح'); return; }
-      const rows = await res.json();
-      const tbody = document.querySelector('#bookingsTable tbody');
-      tbody.innerHTML='';
-
-      rows.forEach(r=>{
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${r.name}</td><td>${r.phone}</td><td>${r.date}</td><td>${r.time}</td><td>${r.duration}</td><td>${r.price}</td>
-                        <td><button data-id="${r.id}" class="details">تفاصيل</button></td>`;
-        tbody.appendChild(tr);
-      });
-
-      document.querySelectorAll('.details').forEach(b=>{
-        b.onclick = ()=>{
-          const id = b.dataset.id;
-          const row = rows.find(x=> String(x.id) === String(id));
-          if(row) openModal(row);
-        };
-      });
-
-      // Optional: refresh accounting if dates are same range
-      try { await accRefresh(); } catch(e) {}
-    }
-
-    document.getElementById('loadBtn').onclick = loadBookings;
-
-    const staticPromos = { '60':10, '90':10, '120':15 };
-    const mDurEl = document.getElementById('mDur');
-    const mPriceEl = document.getElementById('mPrice');
-    mDurEl.onchange = function(){ mPriceEl.value = staticPromos[this.value] || ''; };
-    mPriceEl.value = staticPromos[mDurEl.value] || '';
-
-    document.getElementById('mAdd').onclick = async ()=>{
-      const name=document.getElementById('mName').value;
-      const cc = document.getElementById('mCountry').value || '+973';
-      let phoneRaw=document.getElementById('mPhone').value.trim();
-      let digits = phoneRaw.replace(/\D/g,'');
-      if(!digits) return alert('ادخل رقم هاتف صحيح');
-      let phone = digits.startsWith('0') ? cc + digits.replace(/^0+/, '') : (digits.startsWith('+') ? digits : cc + digits);
-
-      const date=document.getElementById('mDate').value;
-      const time=document.getElementById('mTime').value;
-      const duration=document.getElementById('mDur').value;
-      const price=document.getElementById('mPrice').value||0;
-
-      const res = await postJson('/api/bookings',{name,phone,date,time,duration,price});
-      if(res.error) alert('فشل: '+res.error);
-      else {
-        alert('تم الإضافة');
-        await loadBookings();
-        const wkStart=document.getElementById('weekStart').value;
-        if(wkStart) document.getElementById('weekLoad').click();
-      }
-    };
-
-    // Week View
-    document.getElementById('weekLoad').onclick = async ()=>{
-      const start=document.getElementById('weekStart').value;
+    $('weekLoad').onclick = async ()=>{
+      const start = $('weekStart').value;
       if(!start) return alert('اختر بداية الأسبوع');
       const from = start;
       const d = new Date(start); d.setDate(d.getDate()+6);
       const to = d.toISOString().split('T')[0];
-      const res = await fetch(`/api/bookings?from=${from}&to=${to}`, { credentials:'same-origin' });
-      if(res.status===401){ alert('غير مصرح'); return; }
-      const rows = await res.json();
+      const rows = await fetchBookingsRange(from, to);
       renderWeekView(from, rows);
-    };
-
-    document.getElementById('weekToday').onclick = ()=>{
-      document.getElementById('weekStart').value = getWeekStartFor(new Date());
-      document.getElementById('weekLoad').click();
-    };
-
-    document.getElementById('weekPrev').onclick = ()=>{
-      const el = document.getElementById('weekStart');
-      let d = new Date(el.value || getWeekStartFor(new Date()));
-      d.setDate(d.getDate()-7);
-      el.value = d.toISOString().split('T')[0];
-      document.getElementById('weekLoad').click();
-    };
-
-    document.getElementById('weekNext').onclick = ()=>{
-      const el = document.getElementById('weekStart');
-      let d = new Date(el.value || getWeekStartFor(new Date()));
-      d.setDate(d.getDate()+7);
-      el.value = d.toISOString().split('T')[0];
-      document.getElementById('weekLoad').click();
-    };
-
-    document.getElementById('clearAll').onclick = async ()=>{
-      if(!confirm('هل أنت متأكد؟ سيتم حذف كل الحجوزات نهائياً')) return;
-      try{
-        const r = await fetch('/api/bookings/all', { method:'DELETE', credentials:'same-origin' });
-        const data = await r.json();
-        if(r.ok){
-          alert('تم حذف جميع الحجوزات');
-          await loadBookings();
-          const wkStart=document.getElementById('weekStart').value;
-          if(wkStart) document.getElementById('weekLoad').click();
-        } else alert('فشل: '+(data.error||'غير متوقع'));
-      }catch(e){
-        alert('فشل الاتصال');
-      }
     };
 
     function renderWeekView(startDate, bookings){
       const start = new Date(startDate);
       const days = Array.from({length:7},(_,i)=>{ const dd=new Date(start); dd.setDate(start.getDate()+i); return dd; });
-      const container = document.getElementById('weekView');
+      const container = $('weekView');
       container.innerHTML='';
 
-      // prepare timeslots (30-min steps) — extend to 23:30 and include midnight 00:00
       const times = [];
       for(let h=8; h<=23; h++){
         times.push(`${String(h).padStart(2,'0')}:00`);
@@ -502,13 +524,13 @@
             const td = tr.insertCell();
             td.className = 'free-cell empty';
             td.textContent = '-';
-            td.onclick = ()=>{ openAddModal(key, times[i]); };
+            td.onclick = ()=> openAddModal(key, times[i]);
           } else {
             const td = tr.insertCell();
             td.className = 'booked-cell';
             td.rowSpan = cell.span;
-            td.innerHTML = `<div style="font-weight:700">${cell.name}</div><div style="font-size:0.85rem;margin-top:6px">${cell.time} · ${cell.duration} د</div>`;
-            td.dataset.id = cell.id;
+            td.innerHTML = `<div style="font-weight:700">${escapeHtml(cell.name)}</div>
+                            <div style="font-size:0.85rem;margin-top:6px">${cell.time} · ${cell.duration} د</div>`;
             td.onclick = ()=> openModal(cell);
           }
         });
@@ -517,7 +539,8 @@
       const title = document.createElement('div');
       title.style.fontWeight='700';
       title.style.marginBottom='8px';
-      title.textContent = 'الجدول الأسبوعي — ' + start.toLocaleDateString('ar-EG') + ' → ' + new Date(new Date(start).setDate(start.getDate()+6)).toLocaleDateString('ar-EG');
+      title.textContent = 'الجدول الأسبوعي — ' + start.toLocaleDateString('ar-EG') + ' → ' +
+        new Date(new Date(start).setDate(start.getDate()+6)).toLocaleDateString('ar-EG');
 
       container.appendChild(title);
       const wrap = document.createElement('div');
@@ -526,23 +549,21 @@
       container.appendChild(wrap);
     }
 
-    // Booking detail modal
-    const modal = document.getElementById('detailModal');
+    // ========= Modals =========
+    const modal = $('detailModal');
     function openModal(b){
-      document.getElementById('modalContent').innerHTML =
-        `<div><b>${b.name}</b> — ${b.phone}</div>
+      $('modalContent').innerHTML =
+        `<div><b>${escapeHtml(b.name)}</b> — ${escapeHtml(b.phone)}</div>
          <div>التاريخ: ${b.date}</div>
          <div>الوقت: ${b.time}</div>
          <div>المدة: ${b.duration} دقيقة</div>
          <div>السعر: ${b.price} د.ب</div>`;
       modal.style.display='block';
       modal.dataset.currentId = b.id;
+      modal.dataset.currentDate = b.date || '';
     }
-    document.getElementById('modalClose').onclick = ()=>{
-      modal.style.display='none';
-      modal.dataset.currentId='';
-    };
-    document.getElementById('modalCancel').onclick = async ()=>{
+    $('modalClose').onclick = ()=>{ modal.style.display='none'; };
+    $('modalCancel').onclick = async ()=>{
       if(!confirm('هل تريد إلغاء الحجز؟')) return;
       const id = modal.dataset.currentId;
       const r = await fetch('/api/bookings/'+id, { method:'DELETE', credentials:'same-origin' });
@@ -550,161 +571,105 @@
         alert('تم الإلغاء');
         modal.style.display='none';
         await loadBookings();
-        const wkStart=document.getElementById('weekStart').value;
-        if(wkStart) document.getElementById('weekLoad').click();
+        const wkStart=$('weekStart').value; if(wkStart) $('weekLoad').click();
       } else alert('فشل الحذف');
     };
 
-    // Add booking modal
     function openAddModal(date, time){
-      document.getElementById('addDate').value = date;
-      document.getElementById('addTime').value = time;
-      document.getElementById('addDur').value = '60';
-      document.getElementById('addPrice').value = staticPromos['60'] || '';
-      document.getElementById('addName').value = '';
-      document.getElementById('addPhone').value = '';
-      document.getElementById('addModal').style.display = 'block';
+      $('addDate').value = date;
+      $('addTime').value = time;
+      $('addDur').value = '60';
+      $('addPrice').value = staticPromos['60'] || '';
+      $('addName').value = '';
+      $('addPhone').value = '';
+      $('addModal').style.display = 'block';
     }
-    document.getElementById('addClose').onclick = ()=>{ document.getElementById('addModal').style.display='none'; };
-    document.getElementById('addDur').onchange = function(){ document.getElementById('addPrice').value = staticPromos[this.value] || ''; };
+    $('addClose').onclick = ()=> $('addModal').style.display='none';
+    $('addDur').onchange = function(){ $('addPrice').value = staticPromos[this.value] || ''; };
 
-    document.getElementById('addSave').onclick = async ()=>{
-      const name = document.getElementById('addName').value.trim();
-      const cc = document.getElementById('addCountry').value || '+973';
-      let phoneRaw = document.getElementById('addPhone').value.trim();
+    $('addSave').onclick = async ()=>{
+      const name = $('addName').value.trim();
+      const cc = $('addCountry').value || '+973';
+      let phoneRaw = $('addPhone').value.trim();
       let digits = phoneRaw.replace(/\D/g,'');
       if(!digits) return alert('ادخل رقم هاتف صحيح');
-      let phone = digits.startsWith('0') ? cc + digits.replace(/^0+/, '') : (digits.startsWith('+') ? digits : cc + digits);
+      let phone = digits.startsWith('0') ? cc + digits.replace(/^0+/, '') : cc + digits;
 
-      const date = document.getElementById('addDate').value;
-      const time = document.getElementById('addTime').value;
-      const duration = Number(document.getElementById('addDur').value);
-      const price = Number(document.getElementById('addPrice').value) || 0;
+      const date = $('addDate').value;
+      const time = $('addTime').value;
+      const duration = Number($('addDur').value);
+      const price = Number($('addPrice').value) || 0;
 
-      if(!name || !phone || !date || !time || !duration) return alert('اكمل الحقول المطلوبة');
+      if(!name || !date || !time || !duration) return alert('اكمل الحقول المطلوبة');
 
-      try{
-        const res = await postJson('/api/bookings',{name,phone,date,time,duration,price});
-        if(res && res.error){
-          if(res.error==='conflict') alert('هذا الوقت محجوز');
-          else alert('فشل: '+res.error);
-        } else {
-          alert('تم الإضافة');
-          document.getElementById('addModal').style.display='none';
-          await loadBookings();
-          const wkStart=document.getElementById('weekStart').value;
-          if(wkStart) document.getElementById('weekLoad').click();
-        }
-      }catch(e){
-        alert('فشل الاتصال');
+      const res = await postJson('/api/bookings',{name,phone,date,time,duration,price});
+      if(res && res.error) alert('فشل: '+res.error);
+      else{
+        alert('تمت الإضافة');
+        $('addModal').style.display='none';
+        await loadBookings();
+        const wkStart=$('weekStart').value; if(wkStart) $('weekLoad').click();
       }
     };
 
-    // Change password
-    document.getElementById('chgPwd').onclick = async ()=>{
-      const oldPwd=document.getElementById('oldPwd').value;
-      const newPwd=document.getElementById('newPwd').value;
+    // ========= Password =========
+    $('chgPwd').onclick = async ()=>{
+      const oldPwd=$('oldPwd').value;
+      const newPwd=$('newPwd').value;
       const res = await postJson('/api/admin/change-password',{oldPassword:oldPwd,newPassword:newPwd});
-      if(res.ok) alert('تم التغيير');
-      else alert('فشل: '+(res.error||'غير متوقع'));
+      if(res.ok) alert('تم التغيير'); else alert('فشل: '+(res.error||'غير متوقع'));
     };
 
-    // =====================
-    // Realtime (SSE)
-    // =====================
+    // ========= Realtime SSE =========
     async function postLoginInit(){
       setCurrentWeekAndLoad();
-      startWeekWatcher();
-
       try{
         if(window.eventS && window.eventS.close) window.eventS.close();
         window.eventS = new EventSource('/api/events');
-        window.eventS.addEventListener('booking-created', e => { const b = JSON.parse(e.data); onBookingCreated(b); });
-        window.eventS.addEventListener('booking-deleted', e => { const d = JSON.parse(e.data); onBookingDeleted(d); });
-        window.eventS.addEventListener('bookings-cleared', e => {
-          document.querySelector('#bookingsTable tbody').innerHTML='';
-          const wkStart=document.getElementById('weekStart').value;
-          if(wkStart) document.getElementById('weekLoad').click();
+        window.eventS.addEventListener('booking-created', async e => {
+          const b = JSON.parse(e.data);
+          await loadBookings();
+          const wkStart=$('weekStart').value; if(wkStart) $('weekLoad').click();
           accRefresh();
         });
-        window.eventS.onerror = (err)=>{ console.error('SSE error', err); };
-      }catch(e){
-        console.error('EventSource init failed', e);
-      }
-    }
-
-    function onBookingCreated(b){
-      try{
-        const tbody = document.querySelector('#bookingsTable tbody');
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${b.name}</td><td>${b.phone}</td><td>${b.date}</td><td>${b.time}</td><td>${b.duration}</td><td>${b.price}</td>
-                        <td><button data-id="${b.id}" class="details">تفاصيل</button></td>`;
-        tbody.insertBefore(tr, tbody.firstChild);
-        tr.querySelector('.details').onclick = ()=> openModal(b);
-
-        const wkStart = document.getElementById('weekStart').value;
-        if(wkStart){
-          const wkStartDate = new Date(wkStart);
-          const wkEndDate = new Date(new Date(wkStartDate).setDate(wkStartDate.getDate()+6));
-          const bd = new Date(b.date);
-          if(bd>=wkStartDate && bd<=wkEndDate) document.getElementById('weekLoad').click();
-        }
-        accRefresh();
-      }catch(e){
-        console.error('onBookingCreated error', e);
-      }
-    }
-
-    function onBookingDeleted(d){
-      try{
-        const tbody = document.querySelector('#bookingsTable tbody');
-        const btn = tbody.querySelector(`button[data-id='${d.id}']`);
-        if(btn) btn.closest('tr').remove();
-
-        const wkStart = document.getElementById('weekStart').value;
-        if(wkStart && d.date){
-          const wkStartDate = new Date(wkStart);
-          const wkEndDate = new Date(new Date(wkStartDate).setDate(wkStartDate.getDate()+6));
-          const bd = new Date(d.date);
-          if(bd>=wkStartDate && bd<=wkEndDate) document.getElementById('weekLoad').click();
-        }
-        accRefresh();
-      }catch(e){
-        console.error('onBookingDeleted error', e);
+        window.eventS.addEventListener('booking-deleted', async e => {
+          await loadBookings();
+          const wkStart=$('weekStart').value; if(wkStart) $('weekLoad').click();
+          accRefresh();
+        });
+        window.eventS.addEventListener('bookings-cleared', async e => {
+          await loadBookings();
+          const wkStart=$('weekStart').value; if(wkStart) $('weekLoad').click();
+          accRefresh();
+        });
+      }catch(err){
+        console.error('SSE error', err);
       }
     }
 
     // =====================
-    // Accounting Module
+    // Accounting (Variable + Fixed)
     // =====================
     const ACC = {
       currency: 'د.ب',
-      expensesKey: 'naseej_expenses_v1',
-      charts: { monthly:null, curve:null, expCat:null, yearly:null },
+      keys: {
+        expenses: 'naseej_expenses_v2',        // مصروفات متغيرة
+        fixedIncome: 'naseej_fixed_income_v2', // مدخول ثابت شهري
+        fixedExp: 'naseej_fixed_exp_v2'        // مصروف ثابت شهري
+      },
+      charts: { bookingCurve:null, monthly:null, expCat:null, yearly:null }
     };
 
     function fmtMoney(x){
-      const n = Number(x || 0);
-      return n.toLocaleString('ar-BH', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + ' ' + ACC.currency;
+      const n = Number(x||0);
+      return n.toLocaleString('ar-BH',{minimumFractionDigits:3, maximumFractionDigits:3}) + ' ' + ACC.currency;
     }
 
-    function isoToday(){ return new Date().toISOString().split('T')[0]; }
-    function getMonthKey(dateStr){ return (dateStr || '').slice(0,7); }
-    function getYearKey(dateStr){ return (dateStr || '').slice(0,4); }
-
-    function loadExpenses(){
-      try { return JSON.parse(localStorage.getItem(ACC.expensesKey) || '[]'); }
-      catch { return []; }
+    function loadList(key){
+      try{ return JSON.parse(localStorage.getItem(key) || '[]'); }catch{ return []; }
     }
-    function saveExpenses(list){ localStorage.setItem(ACC.expensesKey, JSON.stringify(list)); }
-
-    function escapeHtml(str){
-      return String(str ?? '')
-        .replaceAll('&','&amp;')
-        .replaceAll('<','&lt;')
-        .replaceAll('>','&gt;')
-        .replaceAll('"','&quot;')
-        .replaceAll("'","&#039;");
+    function saveList(key, list){
+      localStorage.setItem(key, JSON.stringify(list));
     }
 
     function inRange(dateStr, from, to){
@@ -714,30 +679,113 @@
       return true;
     }
 
-    function addExpenseRowToTable(ex){
-      const tb = document.querySelector('#exTable tbody');
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${ex.date}</td>
-        <td>${escapeHtml(ex.title)}</td>
-        <td>${escapeHtml(ex.cat)}</td>
-        <td>${fmtMoney(ex.amount)}</td>
-        <td><button class="danger" data-id="${ex.id}" style="border:none;border-radius:8px;padding:6px 10px">حذف</button></td>
-      `;
-      tb.appendChild(tr);
-      tr.querySelector('button').onclick = ()=>{
-        const all = loadExpenses().filter(x => x.id !== ex.id);
-        saveExpenses(all);
-        renderExpensesTable();
-        accRefresh();
-      };
+    function monthKey(dateStr){ return (dateStr||'').slice(0,7); } // YYYY-MM
+    function yearKey(dateStr){ return (dateStr||'').slice(0,4); }  // YYYY
+
+    function monthsBetween(fromDate, toDate){
+      // fromDate/toDate are "YYYY-MM-DD"
+      const out = [];
+      if(!fromDate || !toDate) return out;
+      let y = Number(fromDate.slice(0,4));
+      let m = Number(fromDate.slice(5,7));
+      const y2 = Number(toDate.slice(0,4));
+      const m2 = Number(toDate.slice(5,7));
+      while(y < y2 || (y === y2 && m <= m2)){
+        out.push(`${String(y)}-${String(m).padStart(2,'0')}`);
+        m++;
+        if(m===13){ m=1; y++; }
+      }
+      return out;
     }
 
-    function renderExpensesTable(){
+    function initAccountingDefaults(){
+      const to = isoToday();
+      const d = new Date();
+      d.setMonth(d.getMonth()-11);
+      const from = d.toISOString().split('T')[0];
+      $('accFrom').value = from;
+      $('accTo').value = to;
+
+      $('exDate').value = to;
+      $('fiStart').value = monthToday();
+      $('fxStart').value = monthToday();
+    }
+
+    function renderVarExpenses(){
       const tb = document.querySelector('#exTable tbody');
-      tb.innerHTML = '';
-      const all = loadExpenses().sort((a,b)=> (a.date > b.date ? -1 : 1));
-      all.forEach(addExpenseRowToTable);
+      tb.innerHTML='';
+      const list = loadList(ACC.keys.expenses).sort((a,b)=> a.date>b.date ? -1 : 1);
+
+      list.forEach(item=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${item.date}</td>
+          <td>${escapeHtml(item.title)}</td>
+          <td>${escapeHtml(item.cat)}</td>
+          <td>${fmtMoney(item.amount)}</td>
+          <td><button class="danger" style="border:none;border-radius:8px;padding:6px 10px">حذف</button></td>
+        `;
+        tr.querySelector('button').onclick = async ()=>{
+          const next = loadList(ACC.keys.expenses).filter(x=> x.id !== item.id);
+          saveList(ACC.keys.expenses, next);
+          renderVarExpenses();
+          accRefresh();
+        };
+        tb.appendChild(tr);
+      });
+    }
+
+    function renderFixedIncome(){
+      const tb = document.querySelector('#fixIncomeTable tbody');
+      tb.innerHTML='';
+      const list = loadList(ACC.keys.fixedIncome).sort((a,b)=> a.start>b.start ? -1 : 1);
+
+      list.forEach(item=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${item.start}</td>
+          <td>${escapeHtml(item.title)}</td>
+          <td>${fmtMoney(item.amount)}</td>
+          <td><button class="danger" style="border:none;border-radius:8px;padding:6px 10px">حذف</button></td>
+        `;
+        tr.querySelector('button').onclick = async ()=>{
+          const next = loadList(ACC.keys.fixedIncome).filter(x=> x.id !== item.id);
+          saveList(ACC.keys.fixedIncome, next);
+          renderFixedIncome();
+          accRefresh();
+        };
+        tb.appendChild(tr);
+      });
+    }
+
+    function renderFixedExp(){
+      const tb = document.querySelector('#fixExpTable tbody');
+      tb.innerHTML='';
+      const list = loadList(ACC.keys.fixedExp).sort((a,b)=> a.start>b.start ? -1 : 1);
+
+      list.forEach(item=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${item.start}</td>
+          <td>${escapeHtml(item.cat)}</td>
+          <td>${escapeHtml(item.title)}</td>
+          <td>${fmtMoney(item.amount)}</td>
+          <td><button class="danger" style="border:none;border-radius:8px;padding:6px 10px">حذف</button></td>
+        `;
+        tr.querySelector('button').onclick = async ()=>{
+          const next = loadList(ACC.keys.fixedExp).filter(x=> x.id !== item.id);
+          saveList(ACC.keys.fixedExp, next);
+          renderFixedExp();
+          accRefresh();
+        };
+        tb.appendChild(tr);
+      });
+    }
+
+    function renderAllAccountingTables(){
+      renderVarExpenses();
+      renderFixedIncome();
+      renderFixedExp();
     }
 
     function sumByMonth(items, getDate, getAmount, from, to){
@@ -745,11 +793,11 @@
       items.forEach(it=>{
         const d = getDate(it);
         if(!inRange(d, from, to)) return;
-        const m = getMonthKey(d);
-        map.set(m, (map.get(m)||0) + Number(getAmount(it)||0));
+        const mk = monthKey(d);
+        map.set(mk, (map.get(mk)||0) + Number(getAmount(it)||0));
       });
       const months = Array.from(map.keys()).sort();
-      return { months, values: months.map(m=> map.get(m) || 0) };
+      return { months, values: months.map(m=> map.get(m)||0) };
     }
 
     function sumByYear(items, getDate, getAmount, from, to){
@@ -757,11 +805,11 @@
       items.forEach(it=>{
         const d = getDate(it);
         if(!inRange(d, from, to)) return;
-        const y = getYearKey(d);
-        map.set(y, (map.get(y)||0) + Number(getAmount(it)||0));
+        const yk = yearKey(d);
+        map.set(yk, (map.get(yk)||0) + Number(getAmount(it)||0));
       });
       const years = Array.from(map.keys()).sort();
-      return { years, values: years.map(y=> map.get(y) || 0) };
+      return { years, values: years.map(y=> map.get(y)||0) };
     }
 
     function sumExpenseByCategory(expenses, from, to){
@@ -771,221 +819,350 @@
         map.set(ex.cat, (map.get(ex.cat)||0) + Number(ex.amount||0));
       });
       const cats = Array.from(map.keys()).sort();
-      return { cats, values: cats.map(c=> map.get(c) || 0) };
+      return { cats, values: cats.map(c=> map.get(c)||0) };
     }
 
-    function cumulative(values){
-      let s = 0;
-      return values.map(v => (s += Number(v||0)));
+    function destroyChart(ch){
+      try{ if(ch && typeof ch.destroy==='function') ch.destroy(); }catch(e){}
     }
 
-    async function fetchBookingsRange(from, to){
-      const q = (from && to) ? `?from=${from}&to=${to}` : '';
-      const res = await fetch('/api/bookings' + q, { credentials:'same-origin' });
-      if(res.status === 401) throw new Error('غير مصرح');
-      return res.json();
-    }
-
-    function destroyChart(ch){ if(ch && typeof ch.destroy === 'function') ch.destroy(); }
-
-    function setKpis(income, expense){
-      document.getElementById('kpiIncome').textContent = fmtMoney(income);
-      document.getElementById('kpiExpense').textContent = fmtMoney(expense);
-      const net = income - expense;
-      const el = document.getElementById('kpiNet');
-      el.textContent = fmtMoney(net);
-      el.style.color = net >= 0 ? '#7CFFB2' : '#FF6B6B';
-    }
-
-    function makeSummaryText(income, expense, monthlyIncome, monthlyExpense){
-      const net = income - expense;
-      const avgIncome = monthlyIncome.length ? (monthlyIncome.reduce((a,b)=>a+b,0)/monthlyIncome.length) : 0;
-      const avgExpense = monthlyExpense.length ? (monthlyExpense.reduce((a,b)=>a+b,0)/monthlyExpense.length) : 0;
-      const bestMonthIncome = monthlyIncome.length ? Math.max(...monthlyIncome) : 0;
-      const worstMonthExpense = monthlyExpense.length ? Math.max(...monthlyExpense) : 0;
+    function makeSummaryText(totalIncome, totalExpense, incomeMonthly, expenseMonthly){
+      const net = totalIncome - totalExpense;
+      const avgI = incomeMonthly.length ? incomeMonthly.reduce((a,b)=>a+b,0)/incomeMonthly.length : 0;
+      const avgE = expenseMonthly.length ? expenseMonthly.reduce((a,b)=>a+b,0)/expenseMonthly.length : 0;
+      const bestI = incomeMonthly.length ? Math.max(...incomeMonthly) : 0;
+      const worstE = expenseMonthly.length ? Math.max(...expenseMonthly) : 0;
 
       return `
-        • متوسط الدخل الشهري: <b>${fmtMoney(avgIncome)}</b><br>
-        • متوسط المصروفات الشهرية: <b>${fmtMoney(avgExpense)}</b><br>
-        • أعلى دخل شهري داخل الفترة: <b>${fmtMoney(bestMonthIncome)}</b><br>
-        • أعلى مصروف شهري داخل الفترة: <b>${fmtMoney(worstMonthExpense)}</b><br>
+        • متوسط الدخل الشهري: <b>${fmtMoney(avgI)}</b><br>
+        • متوسط المصروفات الشهرية: <b>${fmtMoney(avgE)}</b><br>
+        • أعلى دخل شهري داخل الفترة: <b>${fmtMoney(bestI)}</b><br>
+        • أعلى مصروف شهري داخل الفترة: <b>${fmtMoney(worstE)}</b><br>
         • صافي الربح للفترة: <b>${fmtMoney(net)}</b>
       `;
     }
 
-    function initAccountingDefaults(){
-      const to = isoToday();
-      const d = new Date();
-      d.setMonth(d.getMonth()-11);
-      const from = d.toISOString().split('T')[0];
-      document.getElementById('accFrom').value = from;
-      document.getElementById('accTo').value = to;
-      document.getElementById('exDate').value = to;
-      renderExpensesTable();
+    // ---- FIXED items applied per month in range ----
+    function fixedIncomeMonthlyMap(from, to){
+      const months = monthsBetween(from, to); // YYYY-MM list
+      const list = loadList(ACC.keys.fixedIncome);
+      const map = new Map();
+      months.forEach(m=> map.set(m, 0));
+
+      months.forEach(m=>{
+        list.forEach(fi=>{
+          if(fi.start && m >= fi.start){
+            map.set(m, (map.get(m)||0) + Number(fi.amount||0));
+          }
+        });
+      });
+
+      return map; // month -> amount
+    }
+
+    function fixedExpMonthlyMap(from, to){
+      const months = monthsBetween(from, to);
+      const list = loadList(ACC.keys.fixedExp);
+      const map = new Map();
+      months.forEach(m=> map.set(m, 0));
+
+      months.forEach(m=>{
+        list.forEach(fe=>{
+          if(fe.start && m >= fe.start){
+            map.set(m, (map.get(m)||0) + Number(fe.amount||0));
+          }
+        });
+      });
+
+      return map;
+    }
+
+    // ---- Chart: rises per booking ----
+    function buildBookingCurvePoints(bookings){
+      // Sort by date+time, then cumulative
+      const sorted = [...bookings].sort((a,b)=>{
+        const da = (a.date||'') + 'T' + (a.time||'00:00');
+        const db = (b.date||'') + 'T' + (b.time||'00:00');
+        return da < db ? -1 : (da > db ? 1 : 0);
+      });
+
+      const labels = [];
+      const values = [];
+      let cum = 0;
+
+      sorted.forEach(b=>{
+        cum += Number(b.price||0);
+        const label = `${b.date} ${b.time||''}`.trim();
+        labels.push(label);
+        values.push(cum);
+      });
+
+      // لو ما عنده حجوزات
+      if(labels.length === 0){
+        labels.push('—');
+        values.push(0);
+      }
+
+      return { labels, values };
     }
 
     async function accRefresh(){
-      const from = document.getElementById('accFrom').value || '';
-      const to = document.getElementById('accTo').value || '';
-      const expensesAll = loadExpenses();
+      const from = $('accFrom').value || '';
+      const to = $('accTo').value || '';
 
       const bookings = await fetchBookingsRange(from, to);
 
-      const incomeTotal = bookings.reduce((s,b)=> s + Number(b.price||0), 0);
-      const expenseTotal = expensesAll.reduce((s,e)=> s + (inRange(e.date, from, to) ? Number(e.amount||0) : 0), 0);
+      const varExpAll = loadList(ACC.keys.expenses);
+      const varExpInRange = varExpAll.filter(e => inRange(e.date, from, to));
 
-      setKpis(incomeTotal, expenseTotal);
+      // Booking income total
+      const bookingIncomeTotal = bookings.reduce((s,b)=> s + Number(b.price||0), 0);
 
-      const mi = sumByMonth(bookings, b=>b.date, b=>b.price, from, to);
-      const me = sumByMonth(expensesAll, e=>e.date, e=>e.amount, from, to);
+      // Fixed income/expense totals within months range
+      const fiMap = fixedIncomeMonthlyMap(from, to);
+      const feMap = fixedExpMonthlyMap(from, to);
+      const fixedIncomeTotal = Array.from(fiMap.values()).reduce((a,b)=>a+b,0);
+      const fixedExpTotal = Array.from(feMap.values()).reduce((a,b)=>a+b,0);
 
-      const monthsSet = new Set([...mi.months, ...me.months]);
-      const months = Array.from(monthsSet).sort();
+      const varExpTotal = varExpInRange.reduce((s,e)=> s + Number(e.amount||0), 0);
+
+      const totalIncome = bookingIncomeTotal + fixedIncomeTotal;
+      const totalExpense = varExpTotal + fixedExpTotal;
+      const net = totalIncome - totalExpense;
+
+      $('kpiIncome').textContent = fmtMoney(totalIncome);
+      $('kpiExpense').textContent = fmtMoney(totalExpense);
+      $('kpiNet').textContent = fmtMoney(net);
+      $('kpiNet').style.color = net >= 0 ? '#7CFFB2' : '#FF6B6B';
+
+      // Monthly: booking + fixed
+      const miBookings = sumByMonth(bookings, b=>b.date, b=>b.price, from, to);
+      const meVar = sumByMonth(varExpInRange, e=>e.date, e=>e.amount, from, to);
+
+      // unify months
+      const allMonthsSet = new Set([
+        ...monthsBetween(from,to),
+        ...miBookings.months,
+        ...meVar.months
+      ]);
+      const months = Array.from(allMonthsSet).filter(Boolean).sort();
 
       const incomeMonthly = months.map(m=>{
-        const idx = mi.months.indexOf(m);
-        return idx >= 0 ? mi.values[idx] : 0;
+        const idx = miBookings.months.indexOf(m);
+        const bookingPart = idx>=0 ? miBookings.values[idx] : 0;
+        const fixedPart = fiMap.get(m) || 0;
+        return bookingPart + fixedPart;
       });
 
       const expenseMonthly = months.map(m=>{
-        const idx = me.months.indexOf(m);
-        return idx >= 0 ? me.values[idx] : 0;
+        const idx = meVar.months.indexOf(m);
+        const varPart = idx>=0 ? meVar.values[idx] : 0;
+        const fixedPart = feMap.get(m) || 0;
+        return varPart + fixedPart;
       });
 
       const netMonthly = months.map((_,i)=> incomeMonthly[i] - expenseMonthly[i]);
 
-      const cumIncome = cumulative(incomeMonthly);
-      const cumExpense = cumulative(expenseMonthly);
-      const cumNet = months.map((_,i)=> cumIncome[i] - cumExpense[i]);
-
-      const yi = sumByYear(bookings, b=>b.date, b=>b.price, from, to);
-      const ye = sumByYear(expensesAll, e=>e.date, e=>e.amount, from, to);
-      const yearsSet = new Set([...yi.years, ...ye.years]);
-      const years = Array.from(yearsSet).sort();
-
-      const incomeYearly = years.map(y=>{
-        const idx = yi.years.indexOf(y);
-        return idx >= 0 ? yi.values[idx] : 0;
+      // Yearly
+      // For fixed yearly, we can sum monthly arrays by year
+      const byYearIncome = new Map();
+      const byYearExpense = new Map();
+      months.forEach((m, i)=>{
+        const y = m.slice(0,4);
+        byYearIncome.set(y, (byYearIncome.get(y)||0) + incomeMonthly[i]);
+        byYearExpense.set(y, (byYearExpense.get(y)||0) + expenseMonthly[i]);
       });
-
-      const expenseYearly = years.map(y=>{
-        const idx = ye.years.indexOf(y);
-        return idx >= 0 ? ye.values[idx] : 0;
-      });
-
+      const years = Array.from(new Set(months.map(m=>m.slice(0,4)))).sort();
+      const incomeYearly = years.map(y=> byYearIncome.get(y)||0);
+      const expenseYearly = years.map(y=> byYearExpense.get(y)||0);
       const netYearly = years.map((_,i)=> incomeYearly[i] - expenseYearly[i]);
 
-      const byCat = sumExpenseByCategory(expensesAll, from, to);
+      // Expense category pie: include variable + fixed as categories
+      // Fixed expenses don't have real "date" per month entries; we approximate: count them within range to pies by adding (months count) * amount
+      const catMap = new Map();
+      varExpInRange.forEach(e=>{
+        catMap.set(e.cat, (catMap.get(e.cat)||0) + Number(e.amount||0));
+      });
+      const fixedExpList = loadList(ACC.keys.fixedExp);
+      const monthsList = monthsBetween(from,to);
+      fixedExpList.forEach(fe=>{
+        // number of months applicable in range
+        const applicable = monthsList.filter(m => fe.start && m >= fe.start).length;
+        if(applicable>0){
+          catMap.set(fe.cat, (catMap.get(fe.cat)||0) + applicable * Number(fe.amount||0));
+        }
+      });
+      const expCats = Array.from(catMap.keys()).sort();
+      const expVals = expCats.map(c=> catMap.get(c)||0);
+
+      // Booking curve chart (rises per booking)
+      const curve = buildBookingCurvePoints(bookings);
+      destroyChart(ACC.charts.bookingCurve);
+      ACC.charts.bookingCurve = new Chart($('chartBookingCurve'),{
+        type:'line',
+        data:{
+          labels: curve.labels,
+          datasets:[{ label:'الدخل التراكمي من الحجوزات', data: curve.values }]
+        },
+        options:{
+          responsive:true,
+          plugins:{ legend:{ position:'top' } },
+          interaction:{ mode:'index', intersect:false }
+        }
+      });
 
       // Monthly chart
       destroyChart(ACC.charts.monthly);
-      ACC.charts.monthly = new Chart(document.getElementById('chartMonthly'), {
+      ACC.charts.monthly = new Chart($('chartMonthly'),{
         type:'bar',
         data:{
           labels: months,
           datasets:[
-            { label:'الدخل الشهري', data: incomeMonthly },
-            { label:'المصروفات الشهرية', data: expenseMonthly },
-            { label:'صافي الربح الشهري', data: netMonthly, type:'line' },
+            { label:'الدخل الشهري (حجوزات + ثابت)', data: incomeMonthly },
+            { label:'المصروفات الشهرية (متغير + ثابت)', data: expenseMonthly },
+            { label:'صافي الربح الشهري', data: netMonthly, type:'line' }
           ]
         },
         options:{ responsive:true, plugins:{ legend:{ position:'top' } } }
       });
 
-      // Curve (cumulative)
-      destroyChart(ACC.charts.curve);
-      ACC.charts.curve = new Chart(document.getElementById('chartCurve'), {
-        type:'line',
-        data:{
-          labels: months,
-          datasets:[
-            { label:'الدخل التراكمي', data: cumIncome },
-            { label:'المصروفات التراكمية', data: cumExpense },
-            { label:'الصافي التراكمي', data: cumNet },
-          ]
-        },
-        options:{ responsive:true, plugins:{ legend:{ position:'top' } } }
-      });
-
-      // Expense by category
+      // Expense category pie
       destroyChart(ACC.charts.expCat);
-      ACC.charts.expCat = new Chart(document.getElementById('chartExpenseCat'), {
+      ACC.charts.expCat = new Chart($('chartExpenseCat'),{
         type:'pie',
-        data:{ labels: byCat.cats, datasets:[ { label:'مصروفات حسب التصنيف', data: byCat.values } ] },
+        data:{ labels: expCats, datasets:[{ label:'مصروفات حسب التصنيف', data: expVals }] },
         options:{ responsive:true, plugins:{ legend:{ position:'top' } } }
       });
 
       // Yearly chart
       destroyChart(ACC.charts.yearly);
-      ACC.charts.yearly = new Chart(document.getElementById('chartYearly'), {
+      ACC.charts.yearly = new Chart($('chartYearly'),{
         type:'bar',
         data:{
           labels: years,
           datasets:[
             { label:'الدخل السنوي', data: incomeYearly },
             { label:'المصروفات السنوية', data: expenseYearly },
-            { label:'صافي الربح السنوي', data: netYearly, type:'line' },
+            { label:'صافي الربح السنوي', data: netYearly, type:'line' }
           ]
         },
         options:{ responsive:true, plugins:{ legend:{ position:'top' } } }
       });
 
-      document.getElementById('accSummary').innerHTML = makeSummaryText(incomeTotal, expenseTotal, incomeMonthly, expenseMonthly);
+      $('accSummary').innerHTML = makeSummaryText(totalIncome, totalExpense, incomeMonthly, expenseMonthly);
     }
 
-    // Accounting UI events
-    document.getElementById('accRefresh').onclick = accRefresh;
+    // ========= Accounting Buttons =========
+    $('accRefresh').onclick = accRefresh;
 
-    document.getElementById('exAdd').onclick = async ()=>{
-      const date = document.getElementById('exDate').value || isoToday();
-      const title = document.getElementById('exTitle').value.trim();
-      const cat = document.getElementById('exCat').value;
-      const amount = Number(document.getElementById('exAmount').value);
+    $('exAdd').onclick = async ()=>{
+      const date = $('exDate').value || isoToday();
+      const title = $('exTitle').value.trim();
+      const cat = $('exCat').value;
+      const amount = Number($('exAmount').value);
 
-      if(!title) return alert('اكتب وصف للمصروف');
-      if(!amount || amount <= 0) return alert('اكتب مبلغ صحيح');
+      if(!title) return alert('اكتب وصف المصروف');
+      if(!amount || amount<=0) return alert('اكتب مبلغ صحيح');
 
-      const all = loadExpenses();
-      all.push({ id: (Date.now().toString(36)+Math.random().toString(36).slice(2,7)), date, title, cat, amount });
-      saveExpenses(all);
+      const list = loadList(ACC.keys.expenses);
+      list.push({ id: Date.now().toString(36)+Math.random().toString(36).slice(2,7), date, title, cat, amount });
+      saveList(ACC.keys.expenses, list);
 
-      document.getElementById('exTitle').value='';
-      document.getElementById('exAmount').value='';
+      $('exTitle').value='';
+      $('exAmount').value='';
 
-      renderExpensesTable();
-      await accRefresh();
+      renderVarExpenses();
+      accRefresh();
     };
 
-    document.getElementById('accReset').onclick = async ()=>{
-      if(!confirm('متأكد؟ سيتم مسح كل المصروفات المخزنة في هذا الجهاز')) return;
-      localStorage.removeItem(ACC.expensesKey);
-      renderExpensesTable();
-      await accRefresh();
+    $('fiAdd').onclick = async ()=>{
+      const title = $('fiTitle').value.trim();
+      const start = $('fiStart').value; // YYYY-MM
+      const amount = Number($('fiAmount').value);
+
+      if(!title) return alert('اكتب وصف المدخول الثابت');
+      if(!start) return alert('حدد يبدأ من أي شهر');
+      if(!amount || amount<=0) return alert('اكتب مبلغ صحيح');
+
+      const list = loadList(ACC.keys.fixedIncome);
+      list.push({ id: Date.now().toString(36)+Math.random().toString(36).slice(2,7), title, start, amount });
+      saveList(ACC.keys.fixedIncome, list);
+
+      $('fiTitle').value='';
+      $('fiAmount').value='';
+
+      renderFixedIncome();
+      accRefresh();
     };
 
-    document.getElementById('accExport').onclick = async ()=>{
-      // Export bookings (income) + expenses within range to CSV
-      const from = document.getElementById('accFrom').value || '';
-      const to = document.getElementById('accTo').value || '';
+    $('fxAdd').onclick = async ()=>{
+      const title = $('fxTitle').value.trim();
+      const cat = $('fxCat').value;
+      const start = $('fxStart').value; // YYYY-MM
+      const amount = Number($('fxAmount').value);
+
+      if(!title) return alert('اكتب وصف المصروف الثابت');
+      if(!start) return alert('حدد يبدأ من أي شهر');
+      if(!amount || amount<=0) return alert('اكتب مبلغ صحيح');
+
+      const list = loadList(ACC.keys.fixedExp);
+      list.push({ id: Date.now().toString(36)+Math.random().toString(36).slice(2,7), title, cat, start, amount });
+      saveList(ACC.keys.fixedExp, list);
+
+      $('fxTitle').value='';
+      $('fxAmount').value='';
+
+      renderFixedExp();
+      accRefresh();
+    };
+
+    $('accResetAll').onclick = async ()=>{
+      if(!confirm('متأكد؟ سيتم حذف المصروفات المتغيرة والثوابت (داخل هذا الجهاز)')) return;
+      localStorage.removeItem(ACC.keys.expenses);
+      localStorage.removeItem(ACC.keys.fixedIncome);
+      localStorage.removeItem(ACC.keys.fixedExp);
+      renderAllAccountingTables();
+      accRefresh();
+    };
+
+    $('accExport').onclick = async ()=>{
+      const from = $('accFrom').value || '';
+      const to = $('accTo').value || '';
+
       let bookings = [];
-      try{ bookings = await fetchBookingsRange(from, to); } catch(e){ bookings=[]; }
+      try{ bookings = await fetchBookingsRange(from,to); }catch(e){}
 
-      const expenses = loadExpenses().filter(e => inRange(e.date, from, to));
+      const varExp = loadList(ACC.keys.expenses).filter(e => inRange(e.date, from, to));
+      const fixedIncome = loadList(ACC.keys.fixedIncome);
+      const fixedExp = loadList(ACC.keys.fixedExp);
 
       const lines = [];
-      lines.push(['type','date','time','name','phone','duration','category','title','amount'].join(','));
+      lines.push(['type','date_or_month','time','category','title','name','phone','duration','amount'].join(','));
 
       bookings.forEach(b=>{
         lines.push([
-          'income', b.date, b.time, `"${String(b.name||'').replaceAll('"','""')}"`, `"${String(b.phone||'').replaceAll('"','""')}"`,
-          b.duration, '', '', Number(b.price||0)
+          'income_booking', b.date, b.time, '', '', `"${String(b.name||'').replaceAll('"','""')}"`,
+          `"${String(b.phone||'').replaceAll('"','""')}"`, b.duration, Number(b.price||0)
         ].join(','));
       });
 
-      expenses.forEach(e=>{
+      varExp.forEach(e=>{
         lines.push([
-          'expense', e.date, '', '', '', '', `"${String(e.cat||'').replaceAll('"','""')}"`,
-          `"${String(e.title||'').replaceAll('"','""')}"`, Number(e.amount||0)
+          'expense_variable', e.date, '', `"${String(e.cat||'').replaceAll('"','""')}"`,
+          `"${String(e.title||'').replaceAll('"','""')}"`, '', '', '', Number(e.amount||0)
+        ].join(','));
+      });
+
+      fixedIncome.forEach(fi=>{
+        lines.push([
+          'income_fixed_monthly', fi.start, '', '', `"${String(fi.title||'').replaceAll('"','""')}"`, '', '', '', Number(fi.amount||0)
+        ].join(','));
+      });
+
+      fixedExp.forEach(fe=>{
+        lines.push([
+          'expense_fixed_monthly', fe.start, '', `"${String(fe.cat||'').replaceAll('"','""')}"`,
+          `"${String(fe.title||'').replaceAll('"','""')}"`, '', '', '', Number(fe.amount||0)
         ].join(','));
       });
 
@@ -999,6 +1176,12 @@
       a.remove();
       URL.revokeObjectURL(url);
     };
+
+    // ========= Init (after page loads) =========
+    document.addEventListener('DOMContentLoaded', ()=>{
+      // Just in case user opens page already logged-in (optional)
+      // leave as-is; login controls UI.
+    });
   </script>
 </body>
 </html>
