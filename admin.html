@@ -158,7 +158,7 @@
     </div>
 
     <h3 style="margin-top:12px">العروض الخاصة</h3>
-    <div style="margin-top:8px;padding:8px;border-radius:8px;background:linear-gradient(90deg,#e63946,#ffbaba);color:#fff;font-weight:700;text-align:center">العرض الخاص: ساعة ونصف بسعر 10 د، ساعتان بسعر 15 د</div>
+
 
   </div> 
 
@@ -338,7 +338,7 @@
     // نافذة التفاصيل
     const modal = document.getElementById('detailModal');
     function openModal(b){
-      document.getElementById('modalContent').innerHTML = `<div><b>${b.name}</b> — ${b.phone}</div><div>التاريخ: ${b.date}</div><div>الوقت: ${b.time}</div><div>المدة: ${b.duration} دقيقة</div><div>السعر: ${b.price} دينار</div>`;
+      document.getElementById('modalContent').innerHTML = `<div><b>${b.name}</b> — ${b.phone}</div><div>التاريخ: ${b.date}</div><div>الوقت: ${b.time}</div><div>المدة: ${b.duration} دقيقة</div><div>السعر: ${b.price} د.ب</div>`;
       modal.style.display = 'block';
       modal.dataset.currentId = b.id;
     }
