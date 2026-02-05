@@ -1135,57 +1135,89 @@ const miBookings = sumByMonth(
       accRefresh();
     };
 
-    $('accExport').onclick = async ()=>{
-      const from = $('accFrom').value || '';
-      const to = $('accTo').value || '';
+$('accExport').onclick = async ()=>{
+  const from = $('accFrom').value || '';
+  const to   = $('accTo').value || '';
 
-      let bookings = [];
-      try{ bookings = await fetchBookingsRange(from,to); }catch(e){}
+  const bookings = await fetchBookingsRange(from, to);
+  const varExp   = loadList(ACC.keys.expenses).filter(e=> inRange(e.date, from, to));
+  const fixInc   = loadList(ACC.keys.fixedIncome);
+  const fixExp   = loadList(ACC.keys.fixedExp);
 
-      const varExp = loadList(ACC.keys.expenses).filter(e => inRange(e.date, from, to));
-      const fixedIncome = loadList(ACC.keys.fixedIncome);
-      const fixedExp = loadList(ACC.keys.fixedExp);
+  // ===== Dashboard =====
+  const totalIncome =
+    bookings.reduce((s,b)=> s + (Number(staticPromos[String(b.duration)])||0),0)
+    + fixInc.reduce((s,i)=> s + Number(i.amount||0),0);
 
-      const lines = [];
-      lines.push(['type','date_or_month','time','category','title','name','phone','duration','amount'].join(','));
+  const totalExpense =
+    varExp.reduce((s,e)=> s + Number(e.amount||0),0)
+    + fixExp.reduce((s,e)=> s + Number(e.amount||0),0);
 
-      bookings.forEach(b=>{
-        lines.push([
-          'income_booking', b.date, b.time, '', '', `"${String(b.name||'').replaceAll('"','""')}"`,
-          `"${String(b.phone||'').replaceAll('"','""')}"`, b.duration, Number(b.price||0)
-        ].join(','));
-      });
+  const dashboard = [
+    ['التقرير المالي لإدارة الملعب'],
+    [],
+    ['الفترة', `${from || '—'} إلى ${to || '—'}`],
+    ['عدد الحجوزات', bookings.length],
+    ['إجمالي الدخل', totalIncome],
+    ['إجمالي المصروفات', totalExpense],
+    ['صافي الربح', totalIncome - totalExpense],
+  ];
 
-      varExp.forEach(e=>{
-        lines.push([
-          'expense_variable', e.date, '', `"${String(e.cat||'').replaceAll('"','""')}"`,
-          `"${String(e.title||'').replaceAll('"','""')}"`, '', '', '', Number(e.amount||0)
-        ].join(','));
-      });
+  // ===== Bookings =====
+  const bookingsSheet = [
+    ['الاسم','الهاتف','التاريخ','الوقت','المدة','السعر']
+  ];
+  bookings.forEach(b=>{
+    bookingsSheet.push([
+      b.name,
+      b.phone,
+      b.date,
+      b.time,
+      b.duration,
+      Number(staticPromos[String(b.duration)])||0
+    ]);
+  });
 
-      fixedIncome.forEach(fi=>{
-        lines.push([
-          'income_fixed_monthly', fi.start, '', '', `"${String(fi.title||'').replaceAll('"','""')}"`, '', '', '', Number(fi.amount||0)
-        ].join(','));
-      });
+  // ===== Income =====
+  const incomeSheet = [['التاريخ','المصدر','المبلغ']];
+  bookings.forEach(b=>{
+    incomeSheet.push([b.date,'حجز ملعب',Number(staticPromos[String(b.duration)])||0]);
+  });
+  fixInc.forEach(i=>{
+    incomeSheet.push([i.start,'مدخول ثابت',Number(i.amount||0)]);
+  });
 
-      fixedExp.forEach(fe=>{
-        lines.push([
-          'expense_fixed_monthly', fe.start, '', `"${String(fe.cat||'').replaceAll('"','""')}"`,
-          `"${String(fe.title||'').replaceAll('"','""')}"`, '', '', '', Number(fe.amount||0)
-        ].join(','));
-      });
+  // ===== Expenses =====
+  const expensesSheet = [['التاريخ','النوع','التصنيف','الوصف','المبلغ']];
+  varExp.forEach(e=>{
+    expensesSheet.push([e.date,'متغير',e.cat,e.title,Number(e.amount||0)]);
+  });
+  fixExp.forEach(e=>{
+    expensesSheet.push([e.start,'ثابت',e.cat,e.title,Number(e.amount||0)]);
+  });
 
-      const blob = new Blob([lines.join('\n')], { type:'text/csv;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `accounting_${from||'all'}_${to||'all'}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    };
+  // ===== Monthly =====
+  const monthlyMap = {};
+  bookings.forEach(b=>{
+    const m = b.date.slice(0,7);
+    monthlyMap[m] = (monthlyMap[m]||0) + (Number(staticPromos[String(b.duration)])||0);
+  });
+  const monthlySheet = [['الشهر','الدخل']];
+  Object.keys(monthlyMap).sort().forEach(m=>{
+    monthlySheet.push([m, monthlyMap[m]]);
+  });
+
+  // ===== Excel =====
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dashboard), 'Dashboard');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(bookingsSheet), 'Bookings');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(incomeSheet), 'Income');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(expensesSheet), 'Expenses');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(monthlySheet), 'Monthly Report');
+
+  XLSX.writeFile(wb, `Financial_Report_${from || 'all'}_${to || 'all'}.xlsx`);
+};
+
 
     // ========= Init (after page loads) =========
     document.addEventListener('DOMContentLoaded', ()=>{
@@ -1193,5 +1225,6 @@ const miBookings = sumByMonth(
       // leave as-is; login controls UI.
     });
   </script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 </body>
 </html>
