@@ -1,256 +1,376 @@
+// server.js (Fixed + Persistent SQLite using better-sqlite3)
+
 const express = require('express');
 const path = require('path');
-const sqlite3 = require('sqlite3').verbose();
 const bcrypt = require('bcrypt');
 const session = require('express-session');
-
-const DB_FILE = path.join(__dirname, 'data.db');
-const DEFAULT_ADMIN_PWD = 'admin123';
+const Database = require('better-sqlite3');
 
 const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(session({
-  secret: 'change_this_secret',
-  resave: false,
-  saveUninitialized: false,
-  cookie: { secure: false }
-}));
 
-// serve static site files
-app.use('/', express.static(path.join(__dirname)));
+// =====================
+// Config
+// =====================
+const DEFAULT_ADMIN_PWD = 'admin123';
 
-// init db
-const db = new sqlite3.Database(DB_FILE);
+// لو على Render Disk: خلي DB_PATH=/var/data/data.db
+const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'data.db');
 
-function runSql(sql, params=[]) {
-  return new Promise((resolve, reject) => {
-    db.run(sql, params, function(err) {
-      if(err) reject(err); else resolve(this);
-    });
-  });
-}
-function getSql(sql, params=[]) {
-  return new Promise((resolve, reject) => {
-    db.get(sql, params, (err, row) => { if(err) reject(err); else resolve(row); });
-  });
-}
-function allSql(sql, params=[]) {
-  return new Promise((resolve, reject) => {
-    db.all(sql, params, (err, rows) => { if(err) reject(err); else resolve(rows); });
-  });
-}
+// =====================
+// DB init
+// =====================
+const db = new Database(DB_PATH);
+db.pragma('journal_mode = WAL');
 
-async function initDb(){
-  await runSql(`CREATE TABLE IF NOT EXISTS bookings (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+db.exec(`
+  CREATE TABLE IF NOT EXISTS bookings (
+    id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     phone TEXT NOT NULL,
-    date TEXT NOT NULL, -- YYYY-MM-DD
-    time TEXT NOT NULL, -- HH:MM
-    duration INTEGER NOT NULL, -- minutes
-    price REAL NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )`);
+    date TEXT NOT NULL,   -- YYYY-MM-DD
+    time TEXT NOT NULL,   -- HH:MM
+    duration INTEGER NOT NULL,
+    price REAL NOT NULL DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now','localtime'))
+  );
 
-  await runSql(`CREATE TABLE IF NOT EXISTS settings (
+  CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT
-  )`);
+  );
 
-  const row = await getSql(`SELECT value FROM settings WHERE key='admin_password'`);
-  if(!row){
-    const hash = await bcrypt.hash(DEFAULT_ADMIN_PWD, 10);
-    await runSql(`INSERT INTO settings (key, value) VALUES ('admin_password', ?)` , [hash]);
+  CREATE INDEX IF NOT EXISTS idx_bookings_date_time ON bookings(date, time);
+  CREATE INDEX IF NOT EXISTS idx_bookings_phone ON bookings(phone);
+`);
+
+// Ensure admin password exists
+function ensureAdminPassword() {
+  const row = db.prepare(`SELECT value FROM settings WHERE key='admin_password'`).get();
+  if (!row) {
+    const hash = bcrypt.hashSync(DEFAULT_ADMIN_PWD, 10);
+    db.prepare(`INSERT INTO settings (key, value) VALUES ('admin_password', ?)`).run(hash);
     console.log('Admin password set to default ->', DEFAULT_ADMIN_PWD);
   }
+}
+ensureAdminPassword();
 
-  // purge past bookings (dates strictly before today localtime)
-  try{
-    const res = await runSql(`DELETE FROM bookings WHERE date < date('now','localtime')`);
-    console.log('Purged past bookings on startup, rows:', res.changes);
-  }catch(e){ console.error('Purge past bookings failed', e); }
+// (اختياري) حذف الحجوزات الماضية عند التشغيل
+function purgePastBookings() {
+  try {
+    const r = db.prepare(`DELETE FROM bookings WHERE date < date('now','localtime')`).run();
+    console.log('Purged past bookings on startup, rows:', r.changes);
+  } catch (e) {
+    console.error('Purge past bookings failed', e);
+  }
+}
+purgePastBookings();
+
+// =====================
+// Middlewares
+// =====================
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || 'change_this_secret',
+    resave: false,
+    saveUninitialized: false,
+    cookie: { secure: false } // إذا عندك HTTPS + proxy setup نعدلها
+  })
+);
+
+// Static
+app.use('/', express.static(path.join(__dirname)));
+
+// Health endpoint (يفيد للـ uptime monitor)
+app.get('/healthz', (req, res) => res.status(200).send('ok'));
+
+// =====================
+// Helpers
+// =====================
+function requireAdmin(req, res) {
+  if (!req.session || !req.session.isAdmin) {
+    res.status(401).json({ error: 'unauthorized' });
+    return false;
+  }
+  return true;
 }
 
-initDb().catch(err => { console.error('DB init error', err); process.exit(1); });
-
-// User-facing: list bookings by phone (no auth)
-app.get('/api/bookings/user', async (req, res) => {
-  const phone = req.query.phone;
-  if(!phone) return res.status(400).json({error:'phone required'});
-  const rows = await allSql(`SELECT * FROM bookings WHERE phone = ? ORDER BY date, time`, [phone]);
-  res.json(rows);
-});
-
-function dateTimeIsInFuture(dateStr, timeStr){
-  // dateStr YYYY-MM-DD, timeStr HH:MM
-  const dt = new Date(`${dateStr}T${timeStr}:00`);
-  return dt.getTime() > Date.now();
+function timeToMinutes(t) {
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + m;
 }
-
-// User cancellation (by phone matching)
-app.post('/api/bookings/:id/cancel', async (req, res) => {
-  const id = req.params.id;
-  const phone = req.body.phone;
-  if(!phone) return res.status(400).json({error:'phone required'});
-  const row = await getSql(`SELECT * FROM bookings WHERE id = ?`, [id]);
-  if(!row) return res.status(404).json({error:'not found'});
-  if(row.phone !== phone) return res.status(403).json({error:'phone mismatch'});
-  // only allow cancellation for future bookings
-  if(!dateTimeIsInFuture(row.date, row.time)) return res.status(400).json({error:'cannot cancel past or started booking'});
-  await runSql(`DELETE FROM bookings WHERE id = ?`, [id]);
-  if(global.sendSSEEvent) global.sendSSEEvent('booking-deleted', { id: id, date: row.date });
-  res.json({ok:true});
-});
-
-// Admin: delete past bookings on demand
-app.delete('/api/bookings/past', async (req, res) => {
-  if(!req.session || !req.session.isAdmin) return res.status(401).json({error:'unauthorized'});
-  const r = await runSql(`DELETE FROM bookings WHERE date < date('now','localtime')`);
-  if(global.sendSSEEvent) global.sendSSEEvent('bookings-cleared', {});
-  res.json({ok:true, deleted: r.changes});
-});
-
-// helper: check overlap
-function timeToMinutes(t){ const [h,m] = t.split(':').map(Number); return h*60 + m; }
-function overlaps(aStart, aDuration, bStart, bDuration){
+function overlaps(aStart, aDuration, bStart, bDuration) {
   const a1 = timeToMinutes(aStart), a2 = a1 + aDuration;
   const b1 = timeToMinutes(bStart), b2 = b1 + bDuration;
   return Math.max(a1, b1) < Math.min(a2, b2);
 }
 
-// Prices and offers (fixed)
-function getPriceForDuration(dur){
+function dateTimeIsInFuture(dateStr, timeStr) {
+  const dt = new Date(`${dateStr}T${timeStr}:00`);
+  return dt.getTime() > Date.now();
+}
+
+// الأسعار (عدّلها براحتك)
+function getPriceForDuration(dur) {
   const base = { 60: 10, 90: 15, 120: 20 };
-  const offers = { 90: 10, 120: 15 };
-  if(offers[dur]) return offers[dur];
   return base[dur] || 0;
 }
 
-// API
-app.get('/api/slots', async (req, res) => {
+function makeId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+// =====================
+// SSE (Real-time admin updates)
+// =====================
+const sseClients = new Set();
+
+function sendSSEEvent(event, data) {
+  const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+  for (const res of sseClients) {
+    try { res.write(payload); } catch (e) {}
+  }
+}
+
+app.get('/api/events', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  res.set({
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive'
+  });
+  res.write(': connected\n\n');
+  sseClients.add(res);
+  req.on('close', () => sseClients.delete(res));
+});
+
+// =====================
+// API: Slots
+// =====================
+app.get('/api/slots', (req, res) => {
   const date = req.query.date; // YYYY-MM-DD
-  if(!date) return res.status(400).json({error:'date required'});
-  // generate slots every 30 minutes from 08:00 to 23:00 (exclusive of 23:30)
+  if (!date) return res.status(400).json({ error: 'date required' });
+
   const slots = [];
-  for(let h=8; h<=23; h++){
-    slots.push(`${String(h).padStart(2,'0')}:00`);
-    slots.push(`${String(h).padStart(2,'0')}:30`);
+  for (let h = 8; h <= 23; h++) {
+    slots.push(`${String(h).padStart(2, '0')}:00`);
+    slots.push(`${String(h).padStart(2, '0')}:30`);
   }
-  // add midnight slot (00:00) as the last slot of the day
   slots.push('00:00');
-  // fetch bookings for the day
-  const bookings = await allSql(`SELECT time, duration FROM bookings WHERE date = ?`, [date]);
-  // mark availability
-  const out = slots.map(s => ({ time:s, available:true }));
-  for(const b of bookings){
-    out.forEach(o => { if(overlaps(b.time, b.duration, o.time, 30)) o.available = false; });
+
+  const bookings = db
+    .prepare(`SELECT time, duration FROM bookings WHERE date = ?`)
+    .all(date);
+
+  const out = slots.map((s) => ({ time: s, available: true }));
+
+  for (const b of bookings) {
+    out.forEach((o) => {
+      if (overlaps(b.time, Number(b.duration), o.time, 30)) o.available = false;
+    });
   }
+
   res.json(out);
 });
 
-app.get('/api/bookings', async (req, res) => {
+// =====================
+// API: Bookings (Admin list + filter)
+// =====================
+app.get('/api/bookings', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+
   const from = req.query.from;
   const to = req.query.to;
-  // admin only
-  if(!req.session || !req.session.isAdmin) return res.status(401).json({error:'unauthorized'});
+
   let rows;
-  if(from && to){
-    rows = await allSql(`SELECT * FROM bookings WHERE date BETWEEN ? AND ? ORDER BY date, time`, [from, to]);
+  if (from && to) {
+    rows = db
+      .prepare(`SELECT * FROM bookings WHERE date >= ? AND date <= ? ORDER BY date, time`)
+      .all(from, to);
   } else {
-    rows = await allSql(`SELECT * FROM bookings ORDER BY date DESC LIMIT 500`);
+    rows = db
+      .prepare(`SELECT * FROM bookings ORDER BY date DESC, time DESC LIMIT 500`)
+      .all();
   }
+
   res.json(rows);
 });
 
-app.post('/api/bookings', async (req, res) => {
-  const { name, phone, date, time, duration } = req.body;
-  if(!name || !phone || !date || !time || !duration) return res.status(400).json({error:'missing fields'});
-  const dur = Number(duration);
-  // check conflicts
-  const sameDay = await allSql(`SELECT * FROM bookings WHERE date = ?`, [date]);
-  for(const b of sameDay){ if(overlaps(b.time, b.duration, time, dur)) return res.status(409).json({error:'conflict'}); }
-  const priceToUse = getPriceForDuration(dur);
-  const r = await runSql(`INSERT INTO bookings (name, phone, date, time, duration, price) VALUES (?,?,?,?,?,?)`, [name, phone, date, time, dur, priceToUse]);
-  const id = r.lastID;
-  const row = await getSql(`SELECT * FROM bookings WHERE id = ?`, [id]);
+// User-facing: list bookings by phone (no auth)
+app.get('/api/bookings/user', (req, res) => {
+  const phone = (req.query.phone || '').trim();
+  if (!phone) return res.status(400).json({ error: 'phone required' });
 
-  // SMS feature removed — no messages are sent from the server.
+  const rows = db
+    .prepare(`SELECT * FROM bookings WHERE phone = ? ORDER BY date, time`)
+    .all(phone);
 
-  // broadcast to SSE clients
-  if(global.sendSSEEvent) global.sendSSEEvent('booking-created', row);
+  res.json(rows);
+});
+
+// Create booking (used by admin UI + add modal)
+app.post('/api/bookings', (req, res) => {
+  // NOTE: في كودك الحالي، إضافة الحجز من admin.html تحتاج auth (لأنها من لوحة الإدارة بعد تسجيل الدخول)
+  // لكن المستخدم قد يضيف من الواجهة العامة أيضًا حسب مشروعك. إذا تبي تحصره على admin فقط، فعّل requireAdmin هنا.
+  // if (!requireAdmin(req, res)) return;
+
+  const name = (req.body.name || '').trim();
+  const phone = (req.body.phone || '').trim();
+  const date = (req.body.date || '').trim();
+  const time = (req.body.time || '').trim();
+  const duration = Number(req.body.duration);
+
+  if (!name || !phone || !date || !time || !duration) {
+    return res.status(400).json({ error: 'missing_fields' });
+  }
+
+  // منع حجز ماضي
+  if (!dateTimeIsInFuture(date, time)) {
+    return res.status(400).json({ error: 'past_booking_not_allowed' });
+  }
+
+  // Conflict check (نفس اليوم)
+  const sameDay = db.prepare(`SELECT time, duration FROM bookings WHERE date = ?`).all(date);
+  for (const b of sameDay) {
+    if (overlaps(b.time, Number(b.duration), time, duration)) {
+      return res.status(409).json({ error: 'conflict' });
+    }
+  }
+
+  const price =
+    req.body.price !== undefined && req.body.price !== null && String(req.body.price).trim() !== ''
+      ? Number(req.body.price)
+      : getPriceForDuration(duration);
+
+  const id = makeId();
+
+  db.prepare(`
+    INSERT INTO bookings (id, name, phone, date, time, duration, price)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(id, name, phone, date, time, duration, Number(price || 0));
+
+  const row = db.prepare(`SELECT * FROM bookings WHERE id = ?`).get(id);
+
+  // broadcast to admin SSE
+  sendSSEEvent('booking-created', row);
+
   res.json(row);
 });
 
-// Admin: delete all bookings
-app.delete('/api/bookings/all', async (req, res) => {
-  if(!req.session || !req.session.isAdmin) return res.status(401).json({error:'unauthorized'});
-  await runSql(`DELETE FROM bookings`);
-  if(global.sendSSEEvent) global.sendSSEEvent('bookings-cleared', {});
-  res.json({ok:true});
-});
-
-app.delete('/api/bookings/:id', async (req, res) => {
-  if(!req.session || !req.session.isAdmin) return res.status(401).json({error:'unauthorized'});
+// Cancel booking by phone (user cancellation)
+app.post('/api/bookings/:id/cancel', (req, res) => {
   const id = req.params.id;
-  const row = await getSql(`SELECT * FROM bookings WHERE id = ?`, [id]);
-  await runSql(`DELETE FROM bookings WHERE id = ?`, [id]);
-  res.json({ok:true});
-  if(row && global.sendSSEEvent) global.sendSSEEvent('booking-deleted', { id: id, date: row.date });
+  const phone = (req.body.phone || '').trim();
+  if (!phone) return res.status(400).json({ error: 'phone required' });
+
+  const row = db.prepare(`SELECT * FROM bookings WHERE id = ?`).get(id);
+  if (!row) return res.status(404).json({ error: 'not found' });
+  if (row.phone !== phone) return res.status(403).json({ error: 'phone mismatch' });
+
+  if (!dateTimeIsInFuture(row.date, row.time)) {
+    return res.status(400).json({ error: 'cannot cancel past or started booking' });
+  }
+
+  db.prepare(`DELETE FROM bookings WHERE id = ?`).run(id);
+  sendSSEEvent('booking-deleted', { id, date: row.date });
+  res.json({ ok: true });
 });
 
+// Admin: delete one booking
+app.delete('/api/bookings/:id', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+
+  const id = req.params.id;
+  const row = db.prepare(`SELECT * FROM bookings WHERE id = ?`).get(id);
+  db.prepare(`DELETE FROM bookings WHERE id = ?`).run(id);
+
+  if (row) sendSSEEvent('booking-deleted', { id, date: row.date });
+  res.json({ ok: true });
+});
+
+// Admin: delete all bookings
+app.delete('/api/bookings/all', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+
+  db.prepare(`DELETE FROM bookings`).run();
+  sendSSEEvent('bookings-cleared', {});
+  res.json({ ok: true });
+});
+
+// Admin: delete past bookings on demand
+app.delete('/api/bookings/past', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+
+  const r = db.prepare(`DELETE FROM bookings WHERE date < date('now','localtime')`).run();
+  sendSSEEvent('bookings-cleared', {});
+  res.json({ ok: true, deleted: r.changes });
+});
+
+// =====================
+// Admin auth
+// =====================
 app.post('/api/admin/login', async (req, res) => {
-  const { password } = req.body;
-  if(!password) return res.status(400).json({error:'password required'});
-  const row = await getSql(`SELECT value FROM settings WHERE key='admin_password'`);
+  const password = (req.body.password || '').trim();
+  if (!password) return res.status(400).json({ error: 'password required' });
+
+  const row = db.prepare(`SELECT value FROM settings WHERE key='admin_password'`).get();
   const hash = row && row.value;
-  const ok = hash && await bcrypt.compare(password, hash);
-  if(!ok) return res.status(401).json({error:'invalid'});
+
+  const ok = hash && (await bcrypt.compare(password, hash));
+  if (!ok) return res.status(401).json({ error: 'invalid' });
+
   req.session.isAdmin = true;
-  res.json({ok:true});
+  res.json({ ok: true });
 });
 
-app.post('/api/admin/logout', (req,res)=>{ req.session.destroy(()=>res.json({ok:true})); });
+app.post('/api/admin/logout', (req, res) => {
+  req.session.destroy(() => res.json({ ok: true }));
+});
 
 app.post('/api/admin/change-password', async (req, res) => {
-  if(!req.session || !req.session.isAdmin) return res.status(401).json({error:'unauthorized'});
-  const { oldPassword, newPassword } = req.body;
-  if(!oldPassword || !newPassword) return res.status(400).json({error:'missing'});
-  const row = await getSql(`SELECT value FROM settings WHERE key='admin_password'`);
-  const ok = row && await bcrypt.compare(oldPassword, row.value);
-  if(!ok) return res.status(401).json({error:'invalid-old'});
+  if (!requireAdmin(req, res)) return;
+
+  const oldPassword = (req.body.oldPassword || '').trim();
+  const newPassword = (req.body.newPassword || '').trim();
+
+  if (!oldPassword || !newPassword) return res.status(400).json({ error: 'missing' });
+
+  const row = db.prepare(`SELECT value FROM settings WHERE key='admin_password'`).get();
+  const ok = row && (await bcrypt.compare(oldPassword, row.value));
+  if (!ok) return res.status(401).json({ error: 'invalid-old' });
+
   const newHash = await bcrypt.hash(newPassword, 10);
-  await runSql(`REPLACE INTO settings (key, value) VALUES ('admin_password', ?)`, [newHash]);
-  res.json({ok:true});
+  db.prepare(`REPLACE INTO settings (key, value) VALUES ('admin_password', ?)`).run(newHash);
+
+  res.json({ ok: true });
 });
 
+// =====================
+// Reports
+// =====================
+app.get('/api/reports', (req, res) => {
+  if (!requireAdmin(req, res)) return;
 
+  const from = req.query.from;
+  const to = req.query.to;
+  if (!from || !to) return res.status(400).json({ error: 'from/to required' });
 
-// SSE: server-sent events to notify admin UI in real-time
-const sseClients = new Set();
-function sendSSEEventLocal(event, data){
-  const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-  for(const res of sseClients){ try{ res.write(payload); }catch(e){ /* ignore write error */ } }
-}
-// expose helper for other handlers
-global.sendSSEEvent = sendSSEEventLocal;
+  const rows = db.prepare(`
+    SELECT date, SUM(price) as revenue, COUNT(*) as bookings
+    FROM bookings
+    WHERE date BETWEEN ? AND ?
+    GROUP BY date
+    ORDER BY date
+  `).all(from, to);
 
-app.get('/api/events', (req, res) => {
-  if(!req.session || !req.session.isAdmin) return res.status(401).end();
-  res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' });
-  res.write(': connected\n\n');
-  sseClients.add(res);
-  req.on('close', ()=>{ sseClients.delete(res); });
+  const total = rows.reduce((s, r) => s + Number(r.revenue || 0), 0);
+  res.json({ rows, total });
 });
 
-app.get('/api/reports', async (req, res) => {
-  if(!req.session || !req.session.isAdmin) return res.status(401).json({error:'unauthorized'});
-  const from = req.query.from; const to = req.query.to;
-  if(!from || !to) return res.status(400).json({error:'from/to required'});
-  const rows = await allSql(`SELECT date, SUM(price) as revenue, COUNT(*) as bookings FROM bookings WHERE date BETWEEN ? AND ? GROUP BY date ORDER BY date`, [from, to]);
-  const total = rows.reduce((s,r)=>s + (r.revenue||0), 0);
-  res.json({rows, total});
-});
-
+// =====================
+// Start
+// =====================
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, ()=>console.log('Server started on', PORT));
+app.listen(PORT, () => console.log('Server started on', PORT, 'DB:', DB_PATH));
