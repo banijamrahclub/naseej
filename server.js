@@ -1,4 +1,4 @@
-// server.js (Fixed + Persistent SQLite using better-sqlite3)
+// server.js (Fixed + Persistent SQLite using better-sqlite3) — Updated (no past_booking_not_allowed)
 
 const express = require('express');
 const path = require('path');
@@ -76,14 +76,14 @@ app.use(
     secret: process.env.SESSION_SECRET || 'change_this_secret',
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: false } // إذا عندك HTTPS + proxy setup نعدلها
+    cookie: { secure: false }
   })
 );
 
 // Static
 app.use('/', express.static(path.join(__dirname)));
 
-// Health endpoint (يفيد للـ uptime monitor)
+// Health endpoint
 app.get('/healthz', (req, res) => res.status(200).send('ok'));
 
 // =====================
@@ -108,6 +108,7 @@ function overlaps(aStart, aDuration, bStart, bDuration) {
 }
 
 function dateTimeIsInFuture(dateStr, timeStr) {
+  // يستخدم وقت السيرفر، مفيد فقط للتحقق في الإلغاء
   const dt = new Date(`${dateStr}T${timeStr}:00`);
   return dt.getTime() > Date.now();
 }
@@ -210,11 +211,9 @@ app.get('/api/bookings/user', (req, res) => {
   res.json(rows);
 });
 
-// Create booking (used by admin UI + add modal)
+// Create booking (admin only — matches your admin.html behavior)
 app.post('/api/bookings', (req, res) => {
-  // NOTE: في كودك الحالي، إضافة الحجز من admin.html تحتاج auth (لأنها من لوحة الإدارة بعد تسجيل الدخول)
-  // لكن المستخدم قد يضيف من الواجهة العامة أيضًا حسب مشروعك. إذا تبي تحصره على admin فقط، فعّل requireAdmin هنا.
-  // if (!requireAdmin(req, res)) return;
+  if (!requireAdmin(req, res)) return;
 
   const name = (req.body.name || '').trim();
   const phone = (req.body.phone || '').trim();
@@ -224,11 +223,6 @@ app.post('/api/bookings', (req, res) => {
 
   if (!name || !phone || !date || !time || !duration) {
     return res.status(400).json({ error: 'missing_fields' });
-  }
-
-  // منع حجز ماضي
-  if (!dateTimeIsInFuture(date, time)) {
-    return res.status(400).json({ error: 'past_booking_not_allowed' });
   }
 
   // Conflict check (نفس اليوم)
@@ -269,6 +263,7 @@ app.post('/api/bookings/:id/cancel', (req, res) => {
   if (!row) return res.status(404).json({ error: 'not found' });
   if (row.phone !== phone) return res.status(403).json({ error: 'phone mismatch' });
 
+  // only allow cancellation for future bookings
   if (!dateTimeIsInFuture(row.date, row.time)) {
     return res.status(400).json({ error: 'cannot cancel past or started booking' });
   }
