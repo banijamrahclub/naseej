@@ -452,13 +452,15 @@ app.post('/api/push/subscribe', async (req, res) => {
   // فحص فوري: لو كان عنده حجز سيبدأ خلال أقل من 30 دقيقة، نرسل له تنبيه الآن
   if (phone && !isAdmin) {
     try {
-      // حساب توقيت البحرين بدقة (UTC+3)
-      const now = new Date();
-      const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
-      const bahrainTime = new Date(utc + (3 * 3600000));
+      // حساب توقيت البحرين (UTC+3) بطريقة يدوية لضمان الدقة
+      const bTime = new Date(Date.now() + (3 * 3600000));
+      const pad = (n) => n.toString().padStart(2, '0');
+      const nowStr = `${bTime.getUTCFullYear()}-${pad(bTime.getUTCMonth()+1)}-${pad(bTime.getUTCDate())} ${pad(bTime.getUTCHours())}:${pad(bTime.getUTCMinutes())}`;
       
-      const thirtyMinsLater = new Date(bahrainTime.getTime() + 30 * 60000).toISOString().replace('T',' ').slice(0,16);
-      const nowStr = bahrainTime.toISOString().replace('T',' ').slice(0,16);
+      const fut = new Date(bTime.getTime() + 32 * 60000);
+      const futStr = `${fut.getUTCFullYear()}-${pad(fut.getUTCMonth()+1)}-${pad(fut.getUTCDate())} ${pad(fut.getUTCHours())}:${pad(fut.getUTCMinutes())}`;
+
+      console.log(`Checking urgent booking for ${phone} between ${nowStr} and ${futStr}`);
 
       const urgent = db.prepare(`
         SELECT * FROM bookings 
@@ -466,7 +468,7 @@ app.post('/api/push/subscribe', async (req, res) => {
         AND remind_sent = 0 
         AND (date || ' ' || time) <= ?
         AND (date || ' ' || time) >= ?
-      `).get(phone, thirtyMinsLater, nowStr);
+      `).get(phone, futStr, nowStr);
 
       if (urgent) {
         await sendPushNotification(subscription, "تذكير فوري ⚽", `موعدك قريب جداً! في تمام الساعة ${urgent.time}`);
@@ -492,21 +494,21 @@ async function sendPushNotification(subscription, title, body) {
 // فاحص المواعيد (كل دقيقة)
 setInterval(async () => {
   try {
-    // حساب توقيت البحرين بدقة (UTC+3)
-    const now = new Date();
-    const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
-    const bahrainTime = new Date(utc + (3 * 3600000));
+    const bTime = new Date(Date.now() + (3 * 3600000));
+    const pad = (n) => n.toString().padStart(2, '0');
     
-    // تحويل الوقت الحالي لموعدين (من +25 دقيقة إلى +35 دقيقة)
-    const minTime = new Date(bahrainTime.getTime() + 25 * 60000).toISOString().replace('T',' ').slice(0,16);
-    const maxTime = new Date(bahrainTime.getTime() + 35 * 60000).toISOString().replace('T',' ').slice(0,16);
+    const minT = new Date(bTime.getTime() + 25 * 60000);
+    const minStr = `${minT.getUTCFullYear()}-${pad(minT.getUTCMonth()+1)}-${pad(minT.getUTCDate())} ${pad(minT.getUTCHours())}:${pad(minT.getUTCMinutes())}`;
+
+    const maxT = new Date(bTime.getTime() + 35 * 60000);
+    const maxStr = `${maxT.getUTCFullYear()}-${pad(maxT.getUTCMonth()+1)}-${pad(maxT.getUTCDate())} ${pad(maxT.getUTCHours())}:${pad(maxT.getUTCMinutes())}`;
 
     const upcoming = db.prepare(`
       SELECT * FROM bookings 
       WHERE remind_sent = 0 
       AND (date || ' ' || time) >= ? 
       AND (date || ' ' || time) <= ?
-    `).all(minTime, maxTime);
+    `).all(minStr, maxStr);
 
     for (const booking of upcoming) {
       console.log('Sending reminder for:', booking.name);
