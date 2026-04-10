@@ -15,6 +15,8 @@ const DEFAULT_ADMIN_PWD = 'admin123';
 
 // لو على Render Disk: خلي DB_PATH=/var/data/data.db
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'data.db');
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwwpp4I1ln9szkC-bS41s2rVvbMf7nIeGL9LGto9w2xxwC9baHF2zdJ7pEhCLVMI4v-/exec';
+
 
 // =====================
 // DB init
@@ -31,6 +33,7 @@ db.exec(`
     time TEXT NOT NULL,   -- HH:MM
     duration INTEGER NOT NULL,
     price REAL NOT NULL DEFAULT 0,
+    g_event_id TEXT,
     created_at TEXT DEFAULT (datetime('now','localtime'))
   );
 
@@ -63,7 +66,9 @@ function purgePastBookings() {
     console.error('Purge past bookings failed', e);
   }
 }
-purgePastBookings();
+// (اختياري) معطل بناءً على طلبك لعدم حذف الحجوزات
+// purgePastBookings();
+
 
 // =====================
 // Middlewares
@@ -123,6 +128,39 @@ function makeId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
+async function syncToGoogleCalendar(booking) {
+  if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.includes('YOUR_GOOGLE_SCRIPT')) return;
+  try {
+    const res = await fetch(GOOGLE_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(booking)
+    });
+    const data = await res.json();
+    if (data.status === 'success' && data.eventId) {
+      db.prepare(`UPDATE bookings SET g_event_id = ? WHERE id = ?`).run(data.eventId, booking.id);
+      console.log('✅ Synced & ID Saved:', data.eventId);
+    }
+  } catch (err) {
+    console.error('❌ Google Calendar Sync Failed:', err.message);
+  }
+}
+
+async function deleteFromGoogleCalendar(eventId) {
+  if (!GOOGLE_SCRIPT_URL || !eventId) return;
+  try {
+    const res = await fetch(GOOGLE_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'delete', eventId: eventId })
+    });
+    const data = await res.json();
+    console.log('🗑️ Google Calendar Response:', data);
+  } catch (err) {
+    console.error('❌ Failed to delete from Google Calendar:', err.message);
+  }
+}
+
 // =====================
 // SSE (Real-time admin updates)
 // =====================
@@ -154,6 +192,12 @@ app.get('/api/slots', (req, res) => {
   const date = req.query.date; // YYYY-MM-DD
   if (!date) return res.status(400).json({ error: 'date required' });
 
+  // توقيت البحرين الحالي
+  const now = new Date();
+  const bahrainTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Bahrain' }));
+  const todayStr = bahrainTime.toISOString().split('T')[0];
+  const nowHM = bahrainTime.getHours().toString().padStart(2, '0') + ":" + bahrainTime.getMinutes().toString().padStart(2, '0');
+
   const slots = [];
   for (let h = 8; h <= 23; h++) {
     slots.push(`${String(h).padStart(2, '0')}:00`);
@@ -165,13 +209,21 @@ app.get('/api/slots', (req, res) => {
     .prepare(`SELECT time, duration FROM bookings WHERE date = ?`)
     .all(date);
 
-  const out = slots.map((s) => ({ time: s, available: true }));
-
-  for (const b of bookings) {
-    out.forEach((o) => {
-      if (overlaps(b.time, Number(b.duration), o.time, 30)) o.available = false;
-    });
-  }
+  const out = slots.map((s) => {
+    let available = true;
+    // منع الأوقات المحجوزة مسبقاً
+    for (const b of bookings) {
+      if (overlaps(b.time, Number(b.duration), s, 30)) {
+        available = false;
+        break;
+      }
+    }
+    // منع الأوقات التي مضت اليوم
+    if (date === todayStr && s <= nowHM && s !== '00:00') {
+      available = false;
+    }
+    return { time: s, available };
+  });
 
   res.json(out);
 });
@@ -211,9 +263,9 @@ app.get('/api/bookings/user', (req, res) => {
   res.json(rows);
 });
 
-// Create booking (admin only — matches your admin.html behavior)
+// Create booking (Open for users, protected price for admin)
 app.post('/api/bookings', (req, res) => {
-  if (!requireAdmin(req, res)) return;
+  const isAdmin = req.session && req.session.isAdmin;
 
   const name = (req.body.name || '').trim();
   const phone = (req.body.phone || '').trim();
@@ -234,23 +286,34 @@ app.post('/api/bookings', (req, res) => {
   }
 
   const price =
-    req.body.price !== undefined && req.body.price !== null && String(req.body.price).trim() !== ''
+    (isAdmin && req.body.price !== undefined && req.body.price !== null && String(req.body.price).trim() !== '')
       ? Number(req.body.price)
       : getPriceForDuration(duration);
 
-  const id = makeId();
+  const finalPrice = Number(price || 0);
+  const finalDuration = Number(duration || 0);
 
-  db.prepare(`
-    INSERT INTO bookings (id, name, phone, date, time, duration, price)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(id, name, phone, date, time, duration, Number(price || 0));
+  try {
+    // نترك الـ id فارغ ليقوم SQLite بإنشائه تلقائياً كـ Integer
+    const info = db.prepare(`
+      INSERT INTO bookings (name, phone, date, time, duration, price)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(String(name), String(phone), String(date), String(time), finalDuration, finalPrice);
+    
+    const newId = info.lastInsertRowid;
+    const row = db.prepare(`SELECT * FROM bookings WHERE id = ?`).get(newId);
 
-  const row = db.prepare(`SELECT * FROM bookings WHERE id = ?`).get(id);
+    // broadcast to admin SSE
+    sendSSEEvent('booking-created', row);
 
-  // broadcast to admin SSE
-  sendSSEEvent('booking-created', row);
+    // Sync with Google Calendar background
+    syncToGoogleCalendar(row);
 
-  res.json(row);
+    res.json(row);
+  } catch (dbErr) {
+    console.error('❌ Database Insert Failed:', dbErr.message);
+    return res.status(500).json({ error: 'database_error' });
+  }
 });
 
 // Cancel booking by phone (user cancellation)
@@ -269,6 +332,10 @@ app.post('/api/bookings/:id/cancel', (req, res) => {
   }
 
   db.prepare(`DELETE FROM bookings WHERE id = ?`).run(id);
+  
+  // Delete from Google Calendar if exists
+  if (row.g_event_id) deleteFromGoogleCalendar(row.g_event_id);
+
   sendSSEEvent('booking-deleted', { id, date: row.date });
   res.json({ ok: true });
 });
@@ -281,7 +348,10 @@ app.delete('/api/bookings/:id', (req, res) => {
   const row = db.prepare(`SELECT * FROM bookings WHERE id = ?`).get(id);
   db.prepare(`DELETE FROM bookings WHERE id = ?`).run(id);
 
-  if (row) sendSSEEvent('booking-deleted', { id, date: row.date });
+  if (row) {
+    if (row.g_event_id) deleteFromGoogleCalendar(row.g_event_id);
+    sendSSEEvent('booking-deleted', { id, date: row.date });
+  }
   res.json({ ok: true });
 });
 
