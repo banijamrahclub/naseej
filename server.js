@@ -434,20 +434,43 @@ app.get('/api/push/key', (req, res) => {
   res.json({ publicKey: VAPID_PUBLIC_KEY });
 });
 
-app.post('/api/push/subscribe', (req, res) => {
+app.post('/api/push/subscribe', async (req, res) => {
   const { subscription, phone, isAdmin } = req.body;
   if (!subscription) return res.status(400).json({ error: 'subscription required' });
   
   const subJson = JSON.stringify(subscription);
   const is_admin = isAdmin ? 1 : 0;
   
-  // نستخدم REPLACE لمنع تكرار نفس الجهاز لنفس الشخص
+  // حفظ أو تحديث الاشتراك
   db.prepare(`
     REPLACE INTO push_subscriptions (phone, is_admin, subscription_json)
     VALUES (?, ?, ?)
   `).run(phone || null, is_admin, subJson);
   
   res.json({ ok: true });
+
+  // فحص فوري: لو كان عنده حجز سيبدأ خلال أقل من 30 دقيقة، نرسل له تنبيه الآن
+  if (phone && !isAdmin) {
+    try {
+      const now = new Date();
+      const bahrainTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Bahrain' }));
+      const thirtyMinsLater = new Date(bahrainTime.getTime() + 30 * 60000).toISOString().replace('T',' ').slice(0,16);
+      const nowStr = bahrainTime.toISOString().replace('T',' ').slice(0,16);
+
+      const urgent = db.prepare(`
+        SELECT * FROM bookings 
+        WHERE phone = ? 
+        AND remind_sent = 0 
+        AND (date || ' ' || time) <= ?
+        AND (date || ' ' || time) >= ?
+      `).get(phone, thirtyMinsLater, nowStr);
+
+      if (urgent) {
+        await sendPushNotification(subscription, "تذكير فوري ⚽", `موعدك قريب جداً! في تمام الساعة ${urgent.time}`);
+        db.prepare(`UPDATE bookings SET remind_sent = 1 WHERE id = ?`).run(urgent.id);
+      }
+    } catch (e) { console.error('Immediate Notification Error:', e); }
+  }
 });
 
 // وظيفة إرسال الإشعار
@@ -466,16 +489,24 @@ async function sendPushNotification(subscription, title, body) {
 // فاحص المواعيد (كل دقيقة)
 setInterval(async () => {
   try {
-    // جلب المواعيد التي ستبدأ بعد 25-30 دقيقة ولم يرسل لها تنبيه
+    // توقيت البحرين الحالي
+    const now = new Date();
+    const bahrainTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Bahrain' }));
+    
+    // تحويل الوقت الحالي لموعدين (من +25 دقيقة إلى +35 دقيقة)
+    const minTime = new Date(bahrainTime.getTime() + 25 * 60000).toISOString().replace('T',' ').slice(0,16);
+    const maxTime = new Date(bahrainTime.getTime() + 35 * 60000).toISOString().replace('T',' ').slice(0,16);
+
     const upcoming = db.prepare(`
       SELECT * FROM bookings 
       WHERE remind_sent = 0 
-      AND datetime(date || ' ' || time) <= datetime('now', '+32 minutes', 'localtime')
-      AND datetime(date || ' ' || time) >= datetime('now', '+25 minutes', 'localtime')
-    `).all();
+      AND (date || ' ' || time) >= ? 
+      AND (date || ' ' || time) <= ?
+    `).all(minTime, maxTime);
 
     for (const booking of upcoming) {
-      const msg = `تذكير: موعدك ${booking.time} بعد 30 دقيقة`;
+      console.log('Sending reminder for:', booking.name);
+      const msg = `تذكير: موعدك ${booking.time} بعد قليل ⚽`;
       
       // 1. إرسال للزبون (بناءً على رقم هاتفه)
       const customerSubs = db.prepare(`SELECT subscription_json FROM push_subscriptions WHERE phone = ?`).all(booking.phone);
