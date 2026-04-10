@@ -452,8 +452,11 @@ app.post('/api/push/subscribe', async (req, res) => {
   // فحص فوري: لو كان عنده حجز سيبدأ خلال أقل من 30 دقيقة، نرسل له تنبيه الآن
   if (phone && !isAdmin) {
     try {
+      // حساب توقيت البحرين بدقة (UTC+3)
       const now = new Date();
-      const bahrainTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Bahrain' }));
+      const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+      const bahrainTime = new Date(utc + (3 * 3600000));
+      
       const thirtyMinsLater = new Date(bahrainTime.getTime() + 30 * 60000).toISOString().replace('T',' ').slice(0,16);
       const nowStr = bahrainTime.toISOString().replace('T',' ').slice(0,16);
 
@@ -489,9 +492,10 @@ async function sendPushNotification(subscription, title, body) {
 // فاحص المواعيد (كل دقيقة)
 setInterval(async () => {
   try {
-    // توقيت البحرين الحالي
+    // حساب توقيت البحرين بدقة (UTC+3)
     const now = new Date();
-    const bahrainTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Bahrain' }));
+    const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+    const bahrainTime = new Date(utc + (3 * 3600000));
     
     // تحويل الوقت الحالي لموعدين (من +25 دقيقة إلى +35 دقيقة)
     const minTime = new Date(bahrainTime.getTime() + 25 * 60000).toISOString().replace('T',' ').slice(0,16);
