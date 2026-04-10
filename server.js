@@ -16,7 +16,6 @@ const DEFAULT_ADMIN_PWD = 'admin123';
 
 // لو على Render Disk: خلي DB_PATH=/var/data/data.db
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'data.db');
-const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'data.db');
 
 
 // =====================
