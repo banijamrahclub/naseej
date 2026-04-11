@@ -357,8 +357,8 @@
         <div class="days-row" id="daysRow"></div>
         
         <div style="display:flex;gap:10px;margin-bottom:10px;justify-content:center;">
-          <button type="button" id="pmFilter" class="submit-btn" style="background:var(--glass);color:#fff;flex:1;padding:8px">مساءً</button>
           <button type="button" id="amFilter" class="submit-btn" style="background:var(--glass);color:#fff;flex:1;padding:8px">صباحاً</button>
+          <button type="button" id="pmFilter" class="submit-btn" style="background:var(--glass);color:#fff;flex:1;padding:8px">مساءً</button>
         </div>
         <div class="slots-grid" id="slotsGrid"></div>
       </div>
@@ -398,6 +398,8 @@
 
 <script>
   let selectedDate = "";
+  let selectedTime = "";
+  let selectedPrice = 0;
   let selectedMins = 0;
   let currentDate = new Date();
   let timeFilter = 'PM'; 
