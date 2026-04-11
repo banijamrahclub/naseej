@@ -449,18 +449,19 @@ app.post('/api/push/subscribe', async (req, res) => {
   
   res.json({ ok: true });
 
-  // فحص فوري: لو كان عنده حجز سيبدأ خلال أقل من 30 دقيقة، نرسل له تنبيه الآن
+  // فحص فوري: لو كان عنده حجز سيبدأ خلال أقل من 32 دقيقة، نرسل له تنبيه الآن
   if (phone && !isAdmin) {
     try {
-      // حساب توقيت البحرين (UTC+3) بطريقة يدوية لضمان الدقة
-      const bTime = new Date(Date.now() + (3 * 3600000));
+      const now = new Date();
+      const bTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Bahrain' }));
       const pad = (n) => n.toString().padStart(2, '0');
-      const nowStr = `${bTime.getUTCFullYear()}-${pad(bTime.getUTCMonth()+1)}-${pad(bTime.getUTCDate())} ${pad(bTime.getUTCHours())}:${pad(bTime.getUTCMinutes())}`;
+      
+      const nowStr = `${bTime.getFullYear()}-${pad(bTime.getMonth()+1)}-${pad(bTime.getDate())} ${pad(bTime.getHours())}:${pad(bTime.getMinutes())}`;
       
       const fut = new Date(bTime.getTime() + 32 * 60000);
-      const futStr = `${fut.getUTCFullYear()}-${pad(fut.getUTCMonth()+1)}-${pad(fut.getUTCDate())} ${pad(fut.getUTCHours())}:${pad(fut.getUTCMinutes())}`;
+      const futStr = `${fut.getFullYear()}-${pad(fut.getMonth()+1)}-${pad(fut.getDate())} ${pad(fut.getHours())}:${pad(fut.getMinutes())}`;
 
-      console.log(`Checking urgent booking for ${phone} between ${nowStr} and ${futStr}`);
+      console.log(`Checking immediate booking for ${phone} between ${nowStr} and ${futStr}`);
 
       const urgent = db.prepare(`
         SELECT * FROM bookings 
@@ -494,14 +495,20 @@ async function sendPushNotification(subscription, title, body) {
 // فاحص المواعيد (كل دقيقة)
 setInterval(async () => {
   try {
-    const bTime = new Date(Date.now() + (3 * 3600000));
+    // الحصول على الوقت الحالي في البحرين
+    const now = new Date();
+    const bTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Bahrain' }));
+    
     const pad = (n) => n.toString().padStart(2, '0');
     
+    // فحص المواعيد التي ستبدأ بعد 25 إلى 35 دقيقة من الآن
     const minT = new Date(bTime.getTime() + 25 * 60000);
-    const minStr = `${minT.getUTCFullYear()}-${pad(minT.getUTCMonth()+1)}-${pad(minT.getUTCDate())} ${pad(minT.getUTCHours())}:${pad(minT.getUTCMinutes())}`;
+    const minStr = `${minT.getFullYear()}-${pad(minT.getMonth()+1)}-${pad(minT.getDate())} ${pad(minT.getHours())}:${pad(minT.getMinutes())}`;
 
     const maxT = new Date(bTime.getTime() + 35 * 60000);
-    const maxStr = `${maxT.getUTCFullYear()}-${pad(maxT.getUTCMonth()+1)}-${pad(maxT.getUTCDate())} ${pad(maxT.getUTCHours())}:${pad(maxT.getUTCMinutes())}`;
+    const maxStr = `${maxT.getFullYear()}-${pad(maxT.getMonth()+1)}-${pad(maxT.getDate())} ${pad(maxT.getHours())}:${pad(maxT.getMinutes())}`;
+
+    console.log(`Checking reminders: ${minStr} to ${maxStr}`);
 
     const upcoming = db.prepare(`
       SELECT * FROM bookings 
@@ -511,22 +518,26 @@ setInterval(async () => {
     `).all(minStr, maxStr);
 
     for (const booking of upcoming) {
-      console.log('Sending reminder for:', booking.name);
-      const msg = `تذكير: موعدك ${booking.time} بعد قليل ⚽`;
+      console.log('Sending reminder for:', booking.name, 'Phone:', booking.phone);
+      const title = "تذكير بموعدك ⚽";
+      const body = `موعدك في تمام الساعة ${booking.time} بعد قليل. ننتظرك!`;
       
-      // 1. إرسال للزبون (بناءً على رقم هاتفه)
+      // 1. إرسال للزبون
       const customerSubs = db.prepare(`SELECT subscription_json FROM push_subscriptions WHERE phone = ?`).all(booking.phone);
+      if (customerSubs.length === 0) {
+        console.warn(`No push subscription found for phone: ${booking.phone}`);
+      }
       for (const s of customerSubs) {
-        await sendPushNotification(JSON.parse(s.subscription_json), "تذكير بموعدك ⚽", msg);
+        await sendPushNotification(JSON.parse(s.subscription_json), title, body);
       }
       
       // 2. إرسال للأدمن
       const adminSubs = db.prepare(`SELECT subscription_json FROM push_subscriptions WHERE is_admin = 1`).all();
       for (const s of adminSubs) {
-        await sendPushNotification(JSON.parse(s.subscription_json), "حجز قادم 🔔", `حجز باسم: ${booking.name} في تمام ${booking.time}`);
+        await sendPushNotification(JSON.parse(s.subscription_json), "تنبيه حجز قادم 🔔", `حجز باسم: ${booking.name} في تمام ${booking.time}`);
       }
 
-      // تحديث أنه تم الإرسال
+      // تحديث الداتابيز
       db.prepare(`UPDATE bookings SET remind_sent = 1 WHERE id = ?`).run(booking.id);
     }
   } catch (e) {
