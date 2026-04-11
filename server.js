@@ -2,10 +2,9 @@
 
 const express = require('express');
 const path = require('path');
-const bcrypt = require('bcryptjs');
+const bcrypt = require('bcrypt');
 const session = require('express-session');
 const Database = require('better-sqlite3');
-const webpush = require('web-push');
 
 const app = express();
 
@@ -17,7 +16,6 @@ const DEFAULT_ADMIN_PWD = 'admin123';
 // لو على Render Disk: خلي DB_PATH=/var/data/data.db
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'data.db');
 
-
 // =====================
 // DB init
 // =====================
@@ -26,29 +24,19 @@ db.pragma('journal_mode = WAL');
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS bookings (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     phone TEXT NOT NULL,
-    date TEXT NOT NULL,
-    time TEXT NOT NULL,
+    date TEXT NOT NULL,   -- YYYY-MM-DD
+    time TEXT NOT NULL,   -- HH:MM
     duration INTEGER NOT NULL,
     price REAL NOT NULL DEFAULT 0,
-    g_event_id TEXT,
-    remind_sent INTEGER DEFAULT 0,
     created_at TEXT DEFAULT (datetime('now','localtime'))
   );
 
   CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT
-  );
-
-  CREATE TABLE IF NOT EXISTS push_subscriptions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    phone TEXT, -- empty for admin
-    is_admin INTEGER DEFAULT 0,
-    subscription_json TEXT NOT NULL,
-    created_at TEXT DEFAULT (datetime('now','localtime'))
   );
 
   CREATE INDEX IF NOT EXISTS idx_bookings_date_time ON bookings(date, time);
@@ -64,27 +52,7 @@ function ensureAdminPassword() {
     console.log('Admin password set to default ->', DEFAULT_ADMIN_PWD);
   }
 }
-
-// Setup VAPID Keys
-function setupVapid() {
-  let pub = db.prepare(`SELECT value FROM settings WHERE key='vapid_public'`).get();
-  let priv = db.prepare(`SELECT value FROM settings WHERE key='vapid_private'`).get();
-  if (!pub || !priv) {
-    const keys = webpush.generateVAPIDKeys();
-    db.prepare(`REPLACE INTO settings (key, value) VALUES ('vapid_public', ?)`).run(keys.publicKey);
-    db.prepare(`REPLACE INTO settings (key, value) VALUES ('vapid_private', ?)`).run(keys.privateKey);
-    pub = { value: keys.publicKey };
-    priv = { value: keys.privateKey };
-  }
-  webpush.setVapidDetails(
-    'mailto:admin@example.com',
-    pub.value,
-    priv.value
-  );
-  return pub.value;
-}
 ensureAdminPassword();
-const VAPID_PUBLIC_KEY = setupVapid();
 
 // (اختياري) حذف الحجوزات الماضية عند التشغيل
 function purgePastBookings() {
@@ -95,9 +63,7 @@ function purgePastBookings() {
     console.error('Purge past bookings failed', e);
   }
 }
-// (اختياري) معطل بناءً على طلبك لعدم حذف الحجوزات
-// purgePastBookings();
-
+purgePastBookings();
 
 // =====================
 // Middlewares
@@ -142,8 +108,8 @@ function overlaps(aStart, aDuration, bStart, bDuration) {
 }
 
 function dateTimeIsInFuture(dateStr, timeStr) {
-  // يفترض أن التوقيت هو توقيت البحرين (GMT+3)
-  const dt = new Date(`${dateStr}T${timeStr}:00+03:00`);
+  // يستخدم وقت السيرفر، مفيد فقط للتحقق في الإلغاء
+  const dt = new Date(`${dateStr}T${timeStr}:00`);
   return dt.getTime() > Date.now();
 }
 
@@ -188,12 +154,6 @@ app.get('/api/slots', (req, res) => {
   const date = req.query.date; // YYYY-MM-DD
   if (!date) return res.status(400).json({ error: 'date required' });
 
-  // توقيت البحرين الحالي
-  const now = new Date();
-  const bahrainTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Bahrain' }));
-  const todayStr = bahrainTime.toISOString().split('T')[0];
-  const nowHM = bahrainTime.getHours().toString().padStart(2, '0') + ":" + bahrainTime.getMinutes().toString().padStart(2, '0');
-
   const slots = [];
   for (let h = 8; h <= 23; h++) {
     slots.push(`${String(h).padStart(2, '0')}:00`);
@@ -205,21 +165,18 @@ app.get('/api/slots', (req, res) => {
     .prepare(`SELECT time, duration FROM bookings WHERE date = ?`)
     .all(date);
 
-  const out = slots.map((s) => {
-    let available = true;
-    // منع الأوقات المحجوزة مسبقاً
-    for (const b of bookings) {
-      if (overlaps(b.time, Number(b.duration), s, 30)) {
-        available = false;
-        break;
+  const out = slots.map((s) => ({
+    time: s,
+    available: dateTimeIsInFuture(date, s)
+  }));
+
+  for (const b of bookings) {
+    out.forEach((o) => {
+      if (o.available && overlaps(b.time, Number(b.duration), o.time, 30)) {
+        o.available = false;
       }
-    }
-    // منع الأوقات التي مضت اليوم
-    if (date === todayStr && s <= nowHM && s !== '00:00') {
-      available = false;
-    }
-    return { time: s, available };
-  });
+    });
+  }
 
   res.json(out);
 });
@@ -259,9 +216,9 @@ app.get('/api/bookings/user', (req, res) => {
   res.json(rows);
 });
 
-// Create booking (Open for users, protected price for admin)
+// Create booking (admin only — matches your admin.html behavior)
 app.post('/api/bookings', (req, res) => {
-  const isAdmin = req.session && req.session.isAdmin;
+  if (!requireAdmin(req, res)) return;
 
   const name = (req.body.name || '').trim();
   const phone = (req.body.phone || '').trim();
@@ -273,6 +230,10 @@ app.post('/api/bookings', (req, res) => {
     return res.status(400).json({ error: 'missing_fields' });
   }
 
+  if (!dateTimeIsInFuture(date, time)) {
+    return res.status(400).json({ error: 'cannot_book_past_time' });
+  }
+
   // Conflict check (نفس اليوم)
   const sameDay = db.prepare(`SELECT time, duration FROM bookings WHERE date = ?`).all(date);
   for (const b of sameDay) {
@@ -282,35 +243,23 @@ app.post('/api/bookings', (req, res) => {
   }
 
   const price =
-    (isAdmin && req.body.price !== undefined && req.body.price !== null && String(req.body.price).trim() !== '')
+    req.body.price !== undefined && req.body.price !== null && String(req.body.price).trim() !== ''
       ? Number(req.body.price)
       : getPriceForDuration(duration);
 
-  const finalPrice = Number(price || 0);
-  const finalDuration = Number(duration || 0);
+  const id = makeId();
 
-  try {
-    const info = db.prepare(`
-      INSERT INTO bookings (name, phone, date, time, duration, price)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(String(name), String(phone), String(date), String(time), finalDuration, finalPrice);
-    
-    const newId = info.lastInsertRowid;
-    const row = db.prepare(`SELECT * FROM bookings WHERE id = ?`).get(newId);
+  db.prepare(`
+    INSERT INTO bookings (id, name, phone, date, time, duration, price)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(id, name, phone, date, time, duration, Number(price || 0));
 
-    if (!row) {
-      console.error('❌ Failed to retrieve newly created booking');
-      return res.status(500).json({ error: 'retrieval_failed' });
-    }
+  const row = db.prepare(`SELECT * FROM bookings WHERE id = ?`).get(id);
 
-    // broadcast to admin SSE
-    sendSSEEvent('booking-created', row);
+  // broadcast to admin SSE
+  sendSSEEvent('booking-created', row);
 
-    res.json(row);
-  } catch (dbErr) {
-    console.error('❌ Database Insert Failed:', dbErr.message);
-    return res.status(500).json({ error: 'database_error: ' + dbErr.message });
-  }
+  res.json(row);
 });
 
 // Cancel booking by phone (user cancellation)
@@ -329,7 +278,6 @@ app.post('/api/bookings/:id/cancel', (req, res) => {
   }
 
   db.prepare(`DELETE FROM bookings WHERE id = ?`).run(id);
-  
   sendSSEEvent('booking-deleted', { id, date: row.date });
   res.json({ ok: true });
 });
@@ -342,9 +290,7 @@ app.delete('/api/bookings/:id', (req, res) => {
   const row = db.prepare(`SELECT * FROM bookings WHERE id = ?`).get(id);
   db.prepare(`DELETE FROM bookings WHERE id = ?`).run(id);
 
-  if (row) {
-    sendSSEEvent('booking-deleted', { id, date: row.date });
-  }
+  if (row) sendSSEEvent('booking-deleted', { id, date: row.date });
   res.json({ ok: true });
 });
 
@@ -426,124 +372,6 @@ app.get('/api/reports', (req, res) => {
   const total = rows.reduce((s, r) => s + Number(r.revenue || 0), 0);
   res.json({ rows, total });
 });
-
-// =====================
-// Web Push API
-// =====================
-app.get('/api/push/key', (req, res) => {
-  res.json({ publicKey: VAPID_PUBLIC_KEY });
-});
-
-app.post('/api/push/subscribe', async (req, res) => {
-  const { subscription, phone, isAdmin } = req.body;
-  if (!subscription) return res.status(400).json({ error: 'subscription required' });
-  
-  const subJson = JSON.stringify(subscription);
-  const is_admin = isAdmin ? 1 : 0;
-  
-  // حفظ أو تحديث الاشتراك
-  db.prepare(`
-    REPLACE INTO push_subscriptions (phone, is_admin, subscription_json)
-    VALUES (?, ?, ?)
-  `).run(phone || null, is_admin, subJson);
-  
-  res.json({ ok: true });
-
-  // فحص فوري: لو كان عنده حجز سيبدأ خلال أقل من 32 دقيقة، نرسل له تنبيه الآن
-  if (phone && !isAdmin) {
-    try {
-      const now = new Date();
-      const bTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Bahrain' }));
-      const pad = (n) => n.toString().padStart(2, '0');
-      
-      const nowStr = `${bTime.getFullYear()}-${pad(bTime.getMonth()+1)}-${pad(bTime.getDate())} ${pad(bTime.getHours())}:${pad(bTime.getMinutes())}`;
-      
-      const fut = new Date(bTime.getTime() + 32 * 60000);
-      const futStr = `${fut.getFullYear()}-${pad(fut.getMonth()+1)}-${pad(fut.getDate())} ${pad(fut.getHours())}:${pad(fut.getMinutes())}`;
-
-      console.log(`Checking immediate booking for ${phone} between ${nowStr} and ${futStr}`);
-
-      const urgent = db.prepare(`
-        SELECT * FROM bookings 
-        WHERE phone = ? 
-        AND remind_sent = 0 
-        AND (date || ' ' || time) <= ?
-        AND (date || ' ' || time) >= ?
-      `).get(phone, futStr, nowStr);
-
-      if (urgent) {
-        await sendPushNotification(subscription, "تذكير فوري ⚽", `موعدك قريب جداً! في تمام الساعة ${urgent.time}`);
-        db.prepare(`UPDATE bookings SET remind_sent = 1 WHERE id = ?`).run(urgent.id);
-      }
-    } catch (e) { console.error('Immediate Notification Error:', e); }
-  }
-});
-
-// وظيفة إرسال الإشعار
-async function sendPushNotification(subscription, title, body) {
-  try {
-    await webpush.sendNotification(subscription, JSON.stringify({ title, body }));
-  } catch (err) {
-    if (err.statusCode === 404 || err.statusCode === 410) {
-      // اشتراك منتهي أو محذوف، نزيله من الداتابيز
-      db.prepare(`DELETE FROM push_subscriptions WHERE subscription_json = ?`).run(JSON.stringify(subscription));
-    }
-    console.error('Push Error:', err.message);
-  }
-}
-
-// فاحص المواعيد (كل دقيقة)
-setInterval(async () => {
-  try {
-    // الحصول على الوقت الحالي في البحرين
-    const now = new Date();
-    const bTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Bahrain' }));
-    
-    const pad = (n) => n.toString().padStart(2, '0');
-    
-    // فحص المواعيد التي ستبدأ بعد 25 إلى 35 دقيقة من الآن
-    const minT = new Date(bTime.getTime() + 25 * 60000);
-    const minStr = `${minT.getFullYear()}-${pad(minT.getMonth()+1)}-${pad(minT.getDate())} ${pad(minT.getHours())}:${pad(minT.getMinutes())}`;
-
-    const maxT = new Date(bTime.getTime() + 35 * 60000);
-    const maxStr = `${maxT.getFullYear()}-${pad(maxT.getMonth()+1)}-${pad(maxT.getDate())} ${pad(maxT.getHours())}:${pad(maxT.getMinutes())}`;
-
-    console.log(`Checking reminders: ${minStr} to ${maxStr}`);
-
-    const upcoming = db.prepare(`
-      SELECT * FROM bookings 
-      WHERE remind_sent = 0 
-      AND (date || ' ' || time) >= ? 
-      AND (date || ' ' || time) <= ?
-    `).all(minStr, maxStr);
-
-    for (const booking of upcoming) {
-      console.log('Sending reminder for:', booking.name, 'Phone:', booking.phone);
-      const title = "تذكير بموعدك ⚽";
-      const body = `موعدك في تمام الساعة ${booking.time} بعد قليل. ننتظرك!`;
-      
-      // 1. إرسال للزبون
-      const customerSubs = db.prepare(`SELECT subscription_json FROM push_subscriptions WHERE phone = ?`).all(booking.phone);
-      if (customerSubs.length === 0) {
-        console.warn(`No push subscription found for phone: ${booking.phone}`);
-      }
-      for (const s of customerSubs) {
-        await sendPushNotification(JSON.parse(s.subscription_json), title, body);
-      }
-      
-      // 2. إرسال للأدمن
-      const adminSubs = db.prepare(`SELECT subscription_json FROM push_subscriptions WHERE is_admin = 1`).all();
-      for (const s of adminSubs) {
-        await sendPushNotification(JSON.parse(s.subscription_json), "تنبيه حجز قادم 🔔", `حجز باسم: ${booking.name} في تمام ${booking.time}`);
-      }
-
-      // تحديث الداتابيز
-      db.prepare(`UPDATE bookings SET remind_sent = 1 WHERE id = ?`).run(booking.id);
-    }
-  } catch (e) {
-    console.error('Reminder Checker Error:', e);
-  }
-}, 60000);
 
 // =====================
 // Start

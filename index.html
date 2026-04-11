@@ -424,7 +424,11 @@
   const subBtn = document.getElementById('subBtn');
 
   // إنشاء الأيام
-  function todayString(){ const t = new Date(); return t.toISOString().split('T')[0]; }
+  function todayString(){ return new Date().toLocaleDateString('en-CA'); }
+  function isFutureTime(dStr, tStr){
+    const dt = new Date(`${dStr}T${tStr}:00`);
+    return dt.getTime() > Date.now();
+  }
   function renderDays(date) {
     daysRow.innerHTML = '';
     const today = todayString();
@@ -483,12 +487,27 @@
           btn.className = 'slot-btn';
           btn.textContent = formatAMPM(h, m);
           if(time === selectedTime) btn.classList.add('selected');
-          btn.onclick = () => { selectedTime = time; renderSlots(); updateSummary(); };
+          
+          const availableLocal = isFutureTime(selectedDate, time);
+          if(!availableLocal){ btn.classList.add('booked'); btn.style.opacity = '0.5'; }
+          
+          if(availableLocal){
+            btn.onclick = () => { selectedTime = time; renderSlots(); updateSummary(); };
+          }
           slotsGrid.appendChild(btn);
         });
       }
       // add midnight slot
-      const midnightBtn = document.createElement('div'); midnightBtn.className='slot-btn'; midnightBtn.textContent = formatAMPM(0,0); midnightBtn.onclick = ()=>{ selectedTime='00:00'; renderSlots(); updateSummary(); }; slotsGrid.appendChild(midnightBtn);
+      const tMid = '00:00';
+      const midAvail = isFutureTime(selectedDate, tMid);
+      const midnightBtn = document.createElement('div'); 
+      midnightBtn.className='slot-btn'; 
+      midnightBtn.textContent = formatAMPM(0,0); 
+      if(!midAvail){ midnightBtn.classList.add('booked'); midnightBtn.style.opacity = '0.5'; }
+      if(midAvail){
+        midnightBtn.onclick = ()=>{ selectedTime=tMid; renderSlots(); updateSummary(); }; 
+      }
+      slotsGrid.appendChild(midnightBtn);
     });
   }
 
@@ -583,8 +602,6 @@
       // عرض تأكيد وحفظ الهاتف لعرض الحجوزات
       alert('تم الحجز بنجاح');
       localStorage.setItem('lastPhone', phone);
-      // تفعيل الإشعارات لهذا الهاتف
-      setupPush(phone);
       // إذا واجهة "حجوزاتي" موجودة، قم بتعبئتها وعرض الحجوزات فورًا
       const myPhoneEl = document.getElementById('myPhone');
       const myCCEl = document.getElementById('myCountryCode');
@@ -708,40 +725,6 @@
 
   // clicking overlay or close for gallery
   document.addEventListener('click', (e)=>{ const overlay=document.getElementById('galleryModal'); if(!overlay) return; if(e.target===overlay || e.target.classList.contains('gallery-close')) closeGallery(); });
-
-  // === WEB PUSH LOGIC ===
-  async function setupPush(phone = null) {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
-    
-    try {
-      const registration = await navigator.serviceWorker.register('/sw.js');
-      const res = await fetch('/api/push/key');
-      const { publicKey } = await res.json();
-      
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(publicKey)
-      });
-      
-      await fetch('/api/push/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subscription, phone })
-      });
-      console.log('Push Subscribed');
-    } catch (err) {
-      console.error('Push setup failed:', err);
-    }
-  }
-
-  function urlBase64ToUint8Array(base64String) {
-    const padding = '='.repeat((4 - base64String.length % 4) % 4);
-    const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
-    const rawData = window.atob(base64);
-    const outputArray = new Uint8Array(rawData.length);
-    for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
-    return outputArray;
-  }
 
 </script>
 
