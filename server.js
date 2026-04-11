@@ -223,10 +223,8 @@ app.get('/api/bookings/user', (req, res) => {
   res.json(rows);
 });
 
-// Create booking (admin only — matches your admin.html behavior)
+// Create booking (Public)
 app.post('/api/bookings', (req, res) => {
-  if (!requireAdmin(req, res)) return;
-
   const name = (req.body.name || '').trim();
   const phone = (req.body.phone || '').trim();
   const date = (req.body.date || '').trim();
