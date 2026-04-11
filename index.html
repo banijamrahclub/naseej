@@ -426,7 +426,7 @@
   // إنشاء الأيام
   function todayString(){ return new Date().toLocaleDateString('en-CA'); }
   function isFutureTime(dStr, tStr){
-    const dt = new Date(`${dStr}T${tStr}:00`);
+    const dt = new Date(`${dStr}T${tStr}:00+03:00`);
     return dt.getTime() > Date.now();
   }
   function renderDays(date) {

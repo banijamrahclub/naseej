@@ -57,7 +57,7 @@ ensureAdminPassword();
 // (اختياري) حذف الحجوزات الماضية عند التشغيل
 function purgePastBookings() {
   try {
-    const r = db.prepare(`DELETE FROM bookings WHERE date < date('now','localtime')`).run();
+    const r = db.prepare(`DELETE FROM bookings WHERE date < date('now','+3 hours')`).run();
     console.log('Purged past bookings on startup, rows:', r.changes);
   } catch (e) {
     console.error('Purge past bookings failed', e);
@@ -108,8 +108,8 @@ function overlaps(aStart, aDuration, bStart, bDuration) {
 }
 
 function dateTimeIsInFuture(dateStr, timeStr) {
-  // يستخدم وقت السيرفر، مفيد فقط للتحقق في الإلغاء
-  const dt = new Date(`${dateStr}T${timeStr}:00`);
+  // نحدد المنطقة الزمنية +03:00 (البحرين/السعودية) لضمان العمل بانتظام على أي سيرفر (مثل Render)
+  const dt = new Date(`${dateStr}T${timeStr}:00+03:00`);
   return dt.getTime() > Date.now();
 }
 
@@ -307,7 +307,7 @@ app.delete('/api/bookings/all', (req, res) => {
 app.delete('/api/bookings/past', (req, res) => {
   if (!requireAdmin(req, res)) return;
 
-  const r = db.prepare(`DELETE FROM bookings WHERE date < date('now','localtime')`).run();
+  const r = db.prepare(`DELETE FROM bookings WHERE date < date('now','+3 hours')`).run();
   sendSSEEvent('bookings-cleared', {});
   res.json({ ok: true, deleted: r.changes });
 });
