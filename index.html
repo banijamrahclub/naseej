@@ -426,7 +426,13 @@
   // إنشاء الأيام
   function todayString(){ return new Date().toLocaleDateString('en-CA'); }
   function isFutureTime(dStr, tStr){
-    const dt = new Date(`${dStr}T${tStr}:00+03:00`);
+    let effectiveDate = dStr;
+    if(tStr === '00:00'){
+      const d = new Date(dStr);
+      d.setDate(d.getDate() + 1);
+      effectiveDate = d.toLocaleDateString('en-CA');
+    }
+    const dt = new Date(`${effectiveDate}T${tStr}:00+03:00`);
     return dt.getTime() > Date.now();
   }
   function renderDays(date) {
@@ -480,7 +486,7 @@
       });
     }).catch(err=>{
       // في حال فشل السيرفر، اعرض الأوقات محلياً
-      for (let h = 8; h <= 23; h++) {
+      for (let h = 1; h <= 23; h++) {
         [0, 30].forEach(m => {
           let time = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
           let btn = document.createElement('div');

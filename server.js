@@ -99,6 +99,8 @@ function requireAdmin(req, res) {
 
 function timeToMinutes(t) {
   const [h, m] = t.split(':').map(Number);
+  // نعتبر الساعة 00:00 هي نهاية اليوم (الدقيقة 1440) وليست بدايته
+  if (h === 0 && m === 0) return 1440;
   return h * 60 + m;
 }
 function overlaps(aStart, aDuration, bStart, bDuration) {
@@ -108,8 +110,13 @@ function overlaps(aStart, aDuration, bStart, bDuration) {
 }
 
 function dateTimeIsInFuture(dateStr, timeStr) {
-  // نحدد المنطقة الزمنية +03:00 (البحرين/السعودية) لضمان العمل بانتظام على أي سيرفر (مثل Render)
-  const dt = new Date(`${dateStr}T${timeStr}:00+03:00`);
+  let effectiveDate = dateStr;
+  if (timeStr === '00:00') {
+    const d = new Date(dateStr);
+    d.setDate(d.getDate() + 1);
+    effectiveDate = d.toLocaleDateString('en-CA');
+  }
+  const dt = new Date(`${effectiveDate}T${timeStr}:00+03:00`);
   return dt.getTime() > Date.now();
 }
 
@@ -155,7 +162,7 @@ app.get('/api/slots', (req, res) => {
   if (!date) return res.status(400).json({ error: 'date required' });
 
   const slots = [];
-  for (let h = 8; h <= 23; h++) {
+  for (let h = 1; h <= 23; h++) {
     slots.push(`${String(h).padStart(2, '0')}:00`);
     slots.push(`${String(h).padStart(2, '0')}:30`);
   }
